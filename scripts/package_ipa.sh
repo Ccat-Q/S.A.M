@@ -7,7 +7,7 @@ mkdir "$PACKAGE_DIR/Payload"
 test -d client/build/ios/iphoneos/Runner.app
 cp -R client/build/ios/iphoneos/Runner.app "$PACKAGE_DIR/Payload/SAM.app"
 test -f "$PACKAGE_DIR/Payload/SAM.app/Runner"
-xcrun lipo -verify_arch arm64 "$PACKAGE_DIR/Payload/SAM.app/Runner"
+xcrun lipo "$PACKAGE_DIR/Payload/SAM.app/Runner" -verify_arch arm64
 /usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$PACKAGE_DIR/Payload/SAM.app/Info.plist"
 /usr/libexec/PlistBuddy -c 'Print MinimumOSVersion' "$PACKAGE_DIR/Payload/SAM.app/Info.plist"
 test "$(/usr/libexec/PlistBuddy -c 'Print MinimumOSVersion' "$PACKAGE_DIR/Payload/SAM.app/Info.plist")" = '16.0'
