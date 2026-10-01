@@ -1,371 +1,103 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../state/system_store.dart';
+import 'device_interfaces.dart';
 import 'instruments.dart';
 import 'theme.dart';
 
-class Inspector extends StatelessWidget {
+class Inspector extends StatefulWidget {
   final SystemStore store;
-  final VoidCallback? openCamera;
-  final VoidCallback? openLogs;
-  const Inspector({
-    super.key,
-    required this.store,
-    this.openCamera,
-    this.openLogs,
-  });
-
-  Future<void> control(
-    BuildContext context,
-    String action,
-    Object? value,
-  ) async {
-    await report(context, () async {
-      final request = store.commandRequest(action, value);
-      final high =
-          ['restart', 'recover', 'disconnect'].contains(action) ||
-          action == 'power' && value == false;
-      if (high) {
-        final prepared = await store.prepare(request);
-        if (!context.mounted) return;
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text(store.tr('COMMAND REQUEST', '控制请求确认')),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${action.toUpperCase()} // ${request['node_id']}',
-                    style: const TextStyle(color: warning),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    store.tr(
-                      'Affected nodes (including dependencies):',
-                      '影响节点（包括依赖设备）：',
-                    ),
-                  ),
-                  Text((prepared['affected_nodes'] as List).join('\n')),
-                  const SizedBox(height: 12),
-                  Text(
-                    store.tr(
-                      'Confirmation expires in 60 seconds. Simulated control.',
-                      '确认请求 60 秒后失效。本操作控制模拟设备。',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: Text(store.tr('CANCEL', '取消')),
-              ),
-              OutlinedButton(
-                key: const Key('confirm-command'),
-                onPressed: () => Navigator.pop(context, true),
-                child: Text(store.tr('CONFIRM', '确认执行')),
-              ),
-            ],
-          ),
-        );
-        if (confirmed != true) return;
-        request['confirmation_id'] = prepared['confirmation_id'];
+  final VoidCallback? openCamera,openLogs;
+  const Inspector({super.key,required this.store,this.openCamera,this.openLogs});
+  @override
+  State<Inspector> createState()=>_InspectorState();
+}
+class _InspectorState extends State<Inspector>{
+  static final knownInterfaces=<String>{};
+  List<String>? sequence;
+  int progress=0;
+  String? pairingNode;
+  int? pairingGeneration;
+  Map<String,dynamic>? diagnostic;
+  String get identity=>'${identityHashCode(widget.store)}:${widget.store.user?['id']}:${widget.store.generation}:${widget.store.selectedId}';
+  Future<void> connect()async{
+    await report(context,()async{
+      await widget.store.link();
+      if(widget.store.linked){if(knownInterfaces.length>128)knownInterfaces.clear();knownInterfaces.add(identity);
+        SystemMessages.shared.emit('SYSTEM LINK / ${widget.store.selectedId} / ESTABLISHED');}
+    });
+    if(mounted)setState(()=>sequence=null);
+  }
+  void pair(){
+    if(knownInterfaces.contains(identity)){connect();return;}
+    final glyphs=['△','○','□']..shuffle(math.Random.secure());
+    setState((){sequence=glyphs;progress=0;pairingNode=widget.store.selectedId;pairingGeneration=widget.store.generation;});
+  }
+  void press(String glyph){
+    if(sequence==null||widget.store.selectedId!=pairingNode||widget.store.generation!=pairingGeneration||!widget.store.connected)return;
+    if(glyph!=sequence![progress]){setState(()=>progress=0);SystemMessages.shared.emit('SIGNAL ALIGNMENT / RETRY');return;}
+    setState(()=>progress++);
+    if(progress==3)connect();
+  }
+  Future<void> control(String action,Object? value)async{
+    final store=widget.store;
+    await report(context,()async{
+      final request=store.commandRequest(action,value);
+      final high=['restart','recover','disconnect'].contains(action)||action=='power'&&value==false;
+      if(high){
+        final prepared=await store.prepare(request);if(!mounted)return;
+        final confirmed=await showDialog<bool>(context:context,builder:(c)=>Dialog(
+          child:Padding(padding:const EdgeInsets.all(24),child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
+            const Text('COMMAND / IMPACT CONFIRMATION',style:TextStyle(fontSize:13,letterSpacing:1.5,color:warning)),
+            const Divider(height:24),Text('${action.toUpperCase()} / ${request['node_id']}',style:const TextStyle(fontSize:12)),
+            const SizedBox(height:20),const Text('DEPENDENCY SET',style:TextStyle(color:muted,fontSize:9)),
+            Text((prepared['affected_nodes'] as List).join('\n'),style:const TextStyle(fontSize:10,height:1.8)),
+            const SizedBox(height:18),Text(store.tr('60 SEC VALIDITY / SIMULATED CONTROL','60 秒有效 / 模拟设备控制'),style:const TextStyle(fontSize:9,color:muted)),
+            Wrap(children:[SoftKey(label:'CANCEL / 取消',onPressed:()=>Navigator.pop(c,false)),
+              SoftKey(key:const Key('confirm-command'),label:'CONFIRM / 确认执行',color:warning,onPressed:()=>Navigator.pop(c,true))]),
+          ])))));
+        if(confirmed!=true)return;request['confirmation_id']=prepared['confirmation_id'];
       }
-      final result = await store.execute(request);
-      if (context.mounted) {
-        final diagnostic = result['diagnostic'];
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${result['state']} // ${result['error'] ?? result['id']}${diagnostic == null ? '' : '\n$diagnostic'}',
-            ),
-          ),
-        );
-      }
+      final result=await store.execute(request);
+      if(!mounted)return;
+      if(result['diagnostic'] is Map)setState(()=>diagnostic=Map<String,dynamic>.from(result['diagnostic'] as Map));
+      SystemMessages.shared.emit('${action.toUpperCase()} / ${request['node_id']} / ${result['error'] ?? result['state']}',error:result['state']=='FAILED');
     });
   }
-
   @override
-  Widget build(BuildContext context) {
-    final n = store.selected;
-    if (n == null)
-      return Panel(
-        title: store.tr('NODE INSPECTOR', '节点检查器'),
-        child: Text(
-          store.tr('Select a node or camera target.', '选择拓扑节点或摄像头中的设备。'),
-        ),
-      );
-    final allowed = store.linked && store.canControl && !store.busy;
-    return Panel(
-      title: 'NODE INSPECTOR // ${n.id}',
-      trailing: StatusLamp(n.status),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(n.name, style: Theme.of(context).textTheme.titleLarge),
-          Reading('TYPE', n.subtype),
-          Reading('MODULE', n.module),
-          Reading('FIRMWARE', n.metadata['firmware'].toString()),
-          Reading('UPTIME', '${n.telemetry['uptime']} SEC'),
-          Reading('POWER', '${n.telemetry['power']}%'),
-          Reading(
-            'THERMAL',
-            '${n.telemetry['temperature']} °C',
-            color: n.fault == 'THERMAL_HIGH' ? warning : ink,
-          ),
-          Reading('LATENCY', '${n.telemetry['latency']} ms'),
-          Reading(
-            'ERROR',
-            n.fault ?? 'NONE',
-            color: n.fault == null ? muted : warning,
-          ),
-          Reading('VERSION', '${n.version}'),
-          Reading(
-            'LAST COMMAND',
-            n.data['last_command']?.toString().substring(0, 8) ?? '—',
-          ),
-          const Divider(height: 28),
-          Text(
-            'OBSERVE  /  IDENTIFY  /  LINK  /  CONTROL',
-            style: const TextStyle(fontSize: 9, color: muted),
-          ),
-          const SizedBox(height: 10),
-          Reading(
-            'CHANNEL',
-            store.connected ? store.stage : 'OFFLINE',
-            color: store.linked ? accent : warning,
-          ),
-          if (!store.connected)
-            Text(
-              store.tr(
-                'Data stale. Reconnect before controlling.',
-                '数据已过期。恢复连接后才能操作。',
-              ),
-              style: const TextStyle(color: warning),
-            ),
-          if (store.scannedId != n.id)
-            OutlinedButton(
-              key: const Key('scan-device'),
-              onPressed: store.connected && store.stage != 'SCANNING'
-                  ? () => report(context, store.scan)
-                  : null,
-              child: Text(
-                store.stage == 'SCANNING'
-                    ? 'SCANNING…'
-                    : store.tr('SCAN DEVICE', '扫描设备'),
-              ),
-            ),
-          if (store.scannedId == n.id && !store.linked && store.canControl)
-            OutlinedButton(
-              key: const Key('link-device'),
-              onPressed: store.connected && store.stage != 'AUTHENTICATING'
-                  ? () => report(context, store.link)
-                  : null,
-              child: Text(
-                store.stage == 'AUTHENTICATING'
-                    ? 'AUTHENTICATING…'
-                    : store.tr('ESTABLISH LINK', '建立连接'),
-              ),
-            ),
-          if (!store.canControl)
-            Text(
-              store.tr('OBSERVER // Read-only access', '观察员 // 只读权限'),
-              style: const TextStyle(color: muted),
-            ),
-          if (store.linked) ...[
-            const SizedBox(height: 12),
-            Text(
-              store.tr('CONTROL CHANNEL AVAILABLE', '控制通道已建立'),
-              style: const TextStyle(color: accent, fontSize: 11),
-            ),
-            if (n.capabilities.contains('power'))
-              Wrap(
-                spacing: 8,
-                children: [
-                  OutlinedButton(
-                    onPressed: allowed
-                        ? () => control(context, 'power', true)
-                        : null,
-                    child: Text(store.tr('RESTORE POWER', '恢复供电')),
-                  ),
-                  OutlinedButton(
-                    onPressed: allowed
-                        ? () => control(context, 'power', false)
-                        : null,
-                    child: Text(store.tr('ISOLATE POWER', '隔离供电')),
-                  ),
-                ],
-              ),
-            if (n.capabilities.contains('door'))
-              Wrap(
-                spacing: 8,
-                children: [
-                  OutlinedButton(
-                    onPressed: allowed
-                        ? () => control(context, 'door', 'open')
-                        : null,
-                    child: Text(store.tr('OPEN HATCH', '打开门禁')),
-                  ),
-                  OutlinedButton(
-                    onPressed: allowed
-                        ? () => control(context, 'door', 'closed')
-                        : null,
-                    child: Text(store.tr('CLOSE HATCH', '关闭门禁')),
-                  ),
-                ],
-              ),
-            if (n.capabilities.contains('brightness'))
-              _slider(
-                context,
-                'brightness',
-                0,
-                100,
-                (n.controls['brightness'] as num).toDouble(),
-                allowed,
-              ),
-            if (n.capabilities.contains('pan'))
-              _slider(
-                context,
-                'pan',
-                -90,
-                90,
-                (n.controls['pan'] as num).toDouble(),
-                allowed,
-              ),
-            if (n.capabilities.contains('tilt'))
-              _slider(
-                context,
-                'tilt',
-                -45,
-                45,
-                (n.controls['tilt'] as num).toDouble(),
-                allowed,
-              ),
-            if (n.capabilities.contains('zoom'))
-              _slider(
-                context,
-                'zoom',
-                1,
-                4,
-                (n.controls['zoom'] as num).toDouble(),
-                allowed,
-              ),
-            Wrap(
-              spacing: 8,
-              children: [
-                OutlinedButton(
-                  onPressed: allowed
-                      ? () => control(context, 'diagnostic', null)
-                      : null,
-                  child: Text(store.tr('DIAGNOSTIC', '诊断')),
-                ),
-                if (n.capabilities.contains('recover') && n.fault != null)
-                  OutlinedButton(
-                    key: const Key('recover-device'),
-                    onPressed: allowed
-                        ? () => control(context, 'recover', null)
-                        : null,
-                    child: Text(store.tr('RECOVER', '恢复故障')),
-                  ),
-                if (n.capabilities.contains('restart'))
-                  OutlinedButton(
-                    onPressed: allowed
-                        ? () => control(context, 'restart', null)
-                        : null,
-                    child: Text(store.tr('RESTART', '重启')),
-                  ),
-                if (n.capabilities.contains('disconnect'))
-                  OutlinedButton(
-                    onPressed: allowed
-                        ? () => control(
-                            context,
-                            'disconnect',
-                            n.controls['connected'] == true,
-                          )
-                        : null,
-                    child: Text(store.tr('TOGGLE LINK', '切换网络连接')),
-                  ),
-              ],
-            ),
-          ],
-          const Divider(height: 28),
-          Wrap(
-            spacing: 8,
-            children: [
-              if (openCamera != null)
-                TextButton(
-                  onPressed: openCamera,
-                  child: Text(store.tr('OPEN CAMERA', '查看摄像头')),
-                ),
-              if (openLogs != null)
-                TextButton(
-                  onPressed: openLogs,
-                  child: Text(store.tr('OPEN LOG', '查看日志')),
-                ),
-            ],
-          ),
+  Widget build(BuildContext context){
+    final store=widget.store,n=store.selected;
+    if(n==null)return const Padding(padding:EdgeInsets.all(20),child:Text('SYSTEM LINK / NO TARGET',style:TextStyle(fontSize:11,color:muted)));
+    if(pairingNode!=n.id||pairingGeneration!=store.generation||!store.connected){sequence=null;progress=0;}
+    final identified=store.scannedId==n.id;
+    final allowed=store.linked&&store.canControl&&!store.busy;
+    return Padding(padding:const EdgeInsets.fromLTRB(18,16,18,26),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+      const Text('DEVICE / SYSTEM LINK',style:TextStyle(fontFamily:'RobotoCondensed',fontSize:13,letterSpacing:2.6,color:accent)),
+      const SizedBox(height:18),Row(children:[Expanded(child:Text(identified ? '${n.subtype} INTERFACE' : 'TARGET / UNIDENTIFIED',style:const TextStyle(fontSize:17,letterSpacing:1.3))),StatusLamp(n.status)]),
+      const SizedBox(height:16),Reading('DEVICE',n.id),Reading('LOCATION',n.module),Reading('CHANNEL',store.connected ? store.stage : 'OFFLINE',color:store.linked ? accent : warning),
+      const Divider(height:28),
+      if(!store.connected)const Text('SIGNAL LOST / CONTROL INHIBITED',style:TextStyle(color:warning,fontSize:10)),
+      if(!identified)SoftKey(key:const Key('scan-device'),label:store.stage=='SCANNING' ? 'IDENTIFYING / SCANNING' : 'SCAN / 扫描设备',
+        onPressed:store.connected&&store.stage!='SCANNING' ? ()=>report(context,store.scan) : null),
+      if(identified&&!store.linked)...[
+        Text('${n.subtype} / DEVICE IDENTIFIED',style:const TextStyle(color:ink,fontSize:11,letterSpacing:1.5)),
+        const SizedBox(height:10),
+        if(!store.canControl)const Text('OBSERVER / READ-ONLY CHANNEL',style:TextStyle(color:muted,fontSize:10))
+        else if(sequence==null)SoftKey(key:const Key('link-device'),label:knownInterfaces.contains(identity) ? 'QUICK PAIR / REQUEST LINK' : 'PAIR / REQUEST SYSTEM LINK',
+          onPressed:store.connected&&store.stage!='AUTHENTICATING' ? pair : null)
+        else ...[
+          const Text('LINK SEQUENCE / ALIGN SIGNAL',style:TextStyle(color:muted,fontSize:9)),
+          const SizedBox(height:12),Text('SEQUENCE / ${sequence!.join(' ')}',key:const Key('pair-sequence'),style:const TextStyle(fontSize:20,letterSpacing:5)),
+          const SizedBox(height:8),Text('${List.filled(progress,'■').join()}${List.filled(3-progress,'░').join()} / ${progress==3 ? 'AUTH CHANNEL / WAIT' : 'TOUCH IN ORDER'}',style:const TextStyle(fontSize:10,color:accent)),
+          Wrap(children:[for(final glyph in ['△','○','□'])SoftKey(key:ValueKey('pair-$glyph'),label:glyph,
+            onPressed:progress<3&&store.connected ? ()=>press(glyph) : null)]),
         ],
-      ),
-    );
+      ],
+      if(store.linked||identified&&!store.canControl)...[const SizedBox(height:14),DeviceInterface(store:store,allowed:allowed,command:control)],
+      if(diagnostic!=null)...[const Divider(height:20),const Text('DIAGNOSTIC / RESPONSE',style:TextStyle(color:muted,fontSize:9)),
+        for(final entry in diagnostic!.entries)Reading(entry.key.toUpperCase(),entry.value.toString())],
+      const SizedBox(height:18),Wrap(children:[if(widget.openCamera!=null)SoftKey(label:'OPTICAL CHANNEL >',onPressed:widget.openCamera),
+        if(widget.openLogs!=null)SoftKey(label:'EVENT HISTORY >',onPressed:widget.openLogs)]),
+    ]));
   }
-
-  Widget _slider(
-    BuildContext context,
-    String action,
-    double min,
-    double max,
-    double current,
-    bool enabled,
-  ) => ControlSlider(
-    key: ValueKey('${store.selectedId}-$action'),
-    label: action.toUpperCase(),
-    min: min,
-    max: max,
-    value: current,
-    enabled: enabled,
-    onSubmit: (value) => control(context, action, value),
-  );
-}
-
-class ControlSlider extends StatefulWidget {
-  final String label;
-  final double min, max, value;
-  final bool enabled;
-  final ValueChanged<double> onSubmit;
-  const ControlSlider({
-    super.key,
-    required this.label,
-    required this.min,
-    required this.max,
-    required this.value,
-    required this.enabled,
-    required this.onSubmit,
-  });
-  @override
-  State<ControlSlider> createState() => _ControlSliderState();
-}
-
-class _ControlSliderState extends State<ControlSlider> {
-  double? draft;
-  @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Reading(widget.label, (draft ?? widget.value).toStringAsFixed(1)),
-      Slider(
-        min: widget.min,
-        max: widget.max,
-        value: (draft ?? widget.value).clamp(widget.min, widget.max).toDouble(),
-        onChanged: widget.enabled ? (v) => setState(() => draft = v) : null,
-        onChangeEnd: widget.enabled
-            ? (v) {
-                widget.onSubmit(v);
-                setState(() => draft = null);
-              }
-            : null,
-      ),
-    ],
-  );
 }

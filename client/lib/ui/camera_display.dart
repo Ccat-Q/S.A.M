@@ -1,315 +1,92 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../state/system_store.dart';
+import '../domain/node.dart';
 import 'theme.dart';
+import 'terminal_effects.dart';
 
-class CameraDisplay extends StatefulWidget {
+String cameraAsset(Node camera) => int.parse(camera.id.split('-').last) <= 4
+    ? 'assets/camera/service-deck.png' : 'assets/camera/relay-deck.png';
+
+class CameraDisplay extends StatelessWidget {
   final SystemStore store;
   final String cameraId;
   final ValueChanged<String> onTarget;
-  const CameraDisplay({
-    super.key,
-    required this.store,
-    required this.cameraId,
-    required this.onTarget,
-  });
+  final bool thumbnail;
+  const CameraDisplay({super.key,required this.store,required this.cameraId,required this.onTarget,this.thumbnail=false});
   @override
-  State<CameraDisplay> createState() => _CameraDisplayState();
-}
-
-class _CameraDisplayState extends State<CameraDisplay>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController pulse;
-  @override
-  void initState() {
-    super.initState();
-    pulse = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 6),
-    )..repeat();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (MediaQuery.of(context).disableAnimations) {
-      pulse.stop();
-    } else if (!pulse.isAnimating) {
-      pulse.repeat();
-    }
-  }
-
-  @override
-  void dispose() {
-    pulse.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final camera = widget.store.nodes[widget.cameraId];
-    if (camera == null) return const SizedBox.shrink();
-    final targets = (widget.store.cameraTargets[widget.cameraId] as List? ?? [])
-        .map((x) => Map<String, dynamic>.from(x as Map))
-        .toList();
-    final motionReduced = MediaQuery.of(context).disableAnimations;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final size = Size(constraints.maxWidth, constraints.maxHeight);
-        final zoom = (camera.controls['zoom'] as num).toDouble();
-        final pan =
-            (camera.controls['pan'] as num).toDouble() / 90 * size.width * 0.15;
-        final tilt =
-            (camera.controls['tilt'] as num).toDouble() /
-            45 *
-            size.height *
-            0.15;
-        final matrix = Matrix4.diagonal3Values(zoom, zoom, 1)
-          ..setTranslationRaw(
-            size.width * (1 - zoom) / 2 + pan,
-            size.height * (1 - zoom) / 2 + tilt,
-            0,
-          );
-        return ClipRect(
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: Transform(
-                  transform: matrix,
-                  child: AnimatedBuilder(
-                    animation: pulse,
-                    builder: (_, __) => CustomPaint(
-                      painter: FacilityPainter(
-                        widget.store,
-                        camera.id,
-                        motionReduced ? 0 : pulse.value,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              if (camera.status != 'OFFLINE')
-                Positioned.fill(
-                  child: Transform(
-                    transform: matrix,
-                    child: Stack(
-                      children: [
-                        for (final target in targets)
-                          Positioned(
-                            left: (target['x'] as num).toDouble() * size.width,
-                            top: (target['y'] as num).toDouble() * size.height,
-                            width:
-                                (target['width'] as num).toDouble() *
-                                size.width,
-                            height:
-                                (target['height'] as num).toDouble() *
-                                size.height,
-                            child: Semantics(
-                              button: true,
-                              label: target['node_id'] as String,
-                              child: GestureDetector(
-                                key: ValueKey('target-${target['node_id']}'),
-                                onTap: () => widget.onTarget(
-                                  target['node_id'] as String,
-                                ),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    border: Border.all(
-                                      color:
-                                          widget.store.selectedId ==
-                                              target['node_id']
-                                          ? accent
-                                          : accent.withValues(alpha: .4),
-                                    ),
-                                  ),
-                                  alignment: Alignment.bottomLeft,
-                                  child: Container(
-                                    color: background.withValues(alpha: .9),
-                                    padding: const EdgeInsets.all(4),
-                                    child: Text(
-                                      '${target['node_id']} // ${widget.store.nodes[target['node_id']]?.subtype}',
-                                      style: const TextStyle(
-                                        fontSize: 8,
-                                        color: accent,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              Positioned(
-                left: 16,
-                top: 16,
-                child: Container(
-                  color: background.withValues(alpha: .8),
-                  padding: const EdgeInsets.all(8),
-                  child: Text(
-                    '${camera.id} / ${camera.module}\n${camera.status}   SIGNAL ${camera.telemetry['signal']}%\nFPS ${camera.telemetry['fps']}   LATENCY ${camera.telemetry['latency']}ms',
-                    style: const TextStyle(fontSize: 10, color: ink),
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 16,
-                top: 16,
-                child: Text(
-                  'SIMULATION\nT+${widget.store.tick * 2}s',
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(color: warning, fontSize: 10),
-                ),
-              ),
-              Positioned(
-                left: 16,
-                bottom: 16,
-                child: Text(
-                  'PAN ${camera.controls['pan']}  TILT ${camera.controls['tilt']}  ZOOM ${zoom.toStringAsFixed(1)}×',
-                  style: const TextStyle(fontSize: 10),
-                ),
-              ),
-              if (camera.status == 'OFFLINE')
-                Center(
-                  child: Text(
-                    'NO SIGNAL // ${camera.id}',
-                    style: const TextStyle(color: warning),
-                  ),
-                ),
-              const Center(
-                child: IgnorePointer(
-                  child: Icon(Icons.add, size: 20, color: Color(0x668fc9bc)),
-                ),
-              ),
-              if (widget.store.crt)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: CustomPaint(painter: ScanlinePainter()),
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
-    );
+  Widget build(BuildContext context){
+    final camera=store.nodes[cameraId];if(camera==null)return const SizedBox.shrink();
+    final targets=(store.cameraTargets[cameraId] as List? ?? []).map((x)=>Map<String,dynamic>.from(x as Map)).toList();
+    return LayoutBuilder(builder:(context,box){
+      final size=Size(box.maxWidth,box.maxHeight);
+      final zoom=(camera.controls['zoom'] as num).toDouble();
+      final pan=(camera.controls['pan'] as num).toDouble()/90*size.width*.15;
+      final tilt=(camera.controls['tilt'] as num).toDouble()/45*size.height*.15;
+      final matrix=Matrix4.diagonal3Values(zoom,zoom,1)..setTranslationRaw(size.width*(1-zoom)/2+pan,size.height*(1-zoom)/2+tilt,0);
+      return ClipRect(child:Stack(children:[
+        if(camera.status!='OFFLINE')Positioned.fill(child:Transform(transform:matrix,
+          child:Image.asset(cameraAsset(camera),fit:BoxFit.fill))),
+        if(camera.status!='OFFLINE'&&store.chromatic)Positioned.fill(child:IgnorePointer(child:Transform(
+          transform:matrix.clone()..setTranslationRaw(matrix.storage[12]+.6,matrix.storage[13],0),
+          child:Opacity(opacity:.025,child:ColorFiltered(colorFilter:const ColorFilter.mode(SamTokens.blue,BlendMode.color),
+            child:Image.asset(cameraAsset(camera),fit:BoxFit.fill)))))),
+        if(camera.status!='OFFLINE'&&!thumbnail)Positioned.fill(child:Transform(transform:matrix,child:Stack(children:[
+          for(final t in targets)Positioned(left:(t['x'] as num).toDouble()*size.width,top:(t['y'] as num).toDouble()*size.height,
+            width:(t['width'] as num).toDouble()*size.width,height:(t['height'] as num).toDouble()*size.height,
+            child:Semantics(button:true,label:'Target ${t['node_id']}',child:MouseRegion(onEnter:(_)=>onTarget(t['node_id'] as String),
+              child:GestureDetector(key:ValueKey('target-${t['node_id']}'),behavior:HitTestBehavior.opaque,
+                onTap:()=>onTarget(t['node_id'] as String),child:CustomPaint(painter:_TargetMarker(
+                  selected:store.selectedId==t['node_id'],identified:store.scannedId==t['node_id'])))))),
+        ]))),
+        Positioned.fill(child:IgnorePointer(child:CustomPaint(painter:_CameraFrame()))),
+        if(!thumbnail)...[
+          Positioned(left:14,top:14,child:Text('${camera.module}\nOPTICAL SENSOR / ${camera.id}\n${camera.status}',
+            style:const TextStyle(fontSize:9,color:ink,height:1.6,shadows:[Shadow(color:Colors.black,blurRadius:4)]))),
+          Positioned(right:14,top:14,child:Text('SIG ${camera.telemetry['signal']}\n${camera.telemetry['fps']} FPS\n${camera.telemetry['latency']} MS',textAlign:TextAlign.right,
+            style:const TextStyle(fontSize:9,color:ink,height:1.6,shadows:[Shadow(color:Colors.black,blurRadius:4)]))),
+          Positioned(left:14,bottom:14,child:Text('PAN ${camera.controls['pan']} / TILT ${camera.controls['tilt']}\nZOOM ${zoom.toStringAsFixed(1)} / T+${store.tick*2}s',
+            style:const TextStyle(fontSize:8,color:ink,height:1.6,shadows:[Shadow(color:Colors.black,blurRadius:4)]))),
+          Positioned(right:14,bottom:14,child:const Text('MOCK FEED\nPRE-RENDERED',textAlign:TextAlign.right,style:TextStyle(fontSize:8,color:ink,height:1.6))),
+        ],
+        if(camera.status=='OFFLINE')Center(child:Column(mainAxisSize:MainAxisSize.min,children:[
+          const Text('NO SIGNAL',style:TextStyle(fontSize:18,letterSpacing:5,color:muted)),const SizedBox(height:10),
+          Text('$cameraId / OPTICAL CHANNEL LOST',style:const TextStyle(fontSize:8,color:muted)),
+        ])),
+        Positioned.fill(child:IgnorePointer(child:CustomPaint(painter:AnalogPainter(crt:store.crt,noise:store.noise,
+          glitch:store.glitch,chromatic:store.chromatic)))),
+      ]));
+    });
   }
 }
-
-class FacilityPainter extends CustomPainter {
-  final SystemStore store;
-  final String cameraId;
-  final double phase;
-  FacilityPainter(this.store, this.cameraId, this.phase);
+class _TargetMarker extends CustomPainter{
+  final bool selected,identified;
+  _TargetMarker({required this.selected,required this.identified});
   @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()..color = const Color(0xff101c1b),
-    );
-    if (store.nodes[cameraId]?.status == 'OFFLINE') return;
-    final pen = Paint()
-      ..color = const Color(0xff324a44)
-      ..strokeWidth = 1
-      ..style = PaintingStyle.stroke;
-    final center = Offset(size.width * .52, size.height * .46);
-    final inner = Rect.fromCenter(
-      center: center,
-      width: size.width * .48,
-      height: size.height * .45,
-    );
-    canvas.drawRect(inner, pen);
-    for (final corner in [
-      Offset.zero,
-      Offset(size.width, 0),
-      Offset(0, size.height),
-      Offset(size.width, size.height),
-    ]) {
-      final end = Offset(
-        corner.dx == 0 ? inner.left : inner.right,
-        corner.dy == 0 ? inner.top : inner.bottom,
-      );
-      canvas.drawLine(corner, end, pen);
-    }
-    for (var i = 1; i <= 6; i++) {
-      final ratio = i / 7;
-      final frame = Rect.lerp(inner, Offset.zero & size, ratio)!;
-      canvas.drawRect(frame, pen..color = const Color(0xff233a33));
-    }
-    final targets = store.cameraTargets[cameraId] as List? ?? [];
-    for (final t in targets) {
-      final rect = Rect.fromLTWH(
-        (t['x'] as num).toDouble() * size.width,
-        (t['y'] as num).toDouble() * size.height,
-        (t['width'] as num).toDouble() * size.width,
-        (t['height'] as num).toDouble() * size.height,
-      );
-      final n = store.nodes[t['node_id']];
-      canvas.drawRect(rect, Paint()..color = const Color(0xff172a25));
-      canvas.drawRect(rect.deflate(5), pen..color = const Color(0xff52635c));
-      for (var i = 0; i < 5; i++) {
-        canvas.drawLine(
-          rect.topLeft + Offset(10, 15 + i * 8),
-          rect.topRight + Offset(-10, 15 + i * 8),
-          pen,
-        );
-      }
-      canvas.drawCircle(
-        rect.bottomRight - const Offset(12, 12),
-        3,
-        Paint()..color = statusColor(n?.status ?? 'OFFLINE'),
-      );
-    }
-    // Original maintenance carriage moving on a rail; not a detected real entity.
-    final cart = Rect.fromLTWH(
-      size.width * (.2 + .4 * phase),
-      size.height * .78,
-      34,
-      18,
-    );
-    canvas.drawRect(cart, Paint()..color = const Color(0xff627c70));
-    if (store.noise) {
-      final random = math.Random((phase * 100).floor());
-      for (var i = 0; i < 200; i++) {
-        canvas.drawCircle(
-          Offset(
-            random.nextDouble() * size.width,
-            random.nextDouble() * size.height,
-          ),
-          .4,
-          Paint()..color = const Color(0x158fc9bc),
-        );
+  void paint(Canvas canvas,Size size){
+    final center=Offset(size.width/2,size.height/2);
+    final p=Paint()..color=ink.withValues(alpha:selected ? .8 : .35)..strokeWidth=.65..style=PaintingStyle.stroke;
+    canvas.drawCircle(center,selected ? 7 : 1.5,p);
+    if(!selected)return;
+    for(final d in [const Offset(1,0),const Offset(-1,0),const Offset(0,1),const Offset(0,-1)])canvas.drawLine(center+d*10,center+d*16,p);
+    if(identified){
+      for(final corner in [Offset.zero,Offset(size.width,0),Offset(0,size.height),Offset(size.width,size.height)]){
+        final dx=corner.dx==0 ? 1.0 : -1.0,dy=corner.dy==0 ? 1.0 : -1.0;
+        canvas.drawLine(corner,corner+Offset(dx*10,0),p);canvas.drawLine(corner,corner+Offset(0,dy*10),p);
       }
     }
-    if (store.chromatic)
-      canvas.drawRect(
-        (Offset.zero & size).deflate(8),
-        Paint()
-          ..color = const Color(0x184e8399)
-          ..strokeWidth = 2
-          ..style = PaintingStyle.stroke,
-      );
-    if (store.glitch && phase > .985)
-      canvas.drawRect(
-        Rect.fromLTWH(0, size.height * .35, size.width, 2),
-        Paint()..color = const Color(0x208fc9bc),
-      );
   }
-
   @override
-  bool shouldRepaint(covariant FacilityPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _TargetMarker oldDelegate)=>selected!=oldDelegate.selected||identified!=oldDelegate.identified;
 }
-
-class ScanlinePainter extends CustomPainter {
+class _CameraFrame extends CustomPainter{
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0x10000000);
-    for (double y = 0; y < size.height; y += 4) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+  void paint(Canvas canvas,Size size){
+    final p=Paint()..color=ink.withValues(alpha:.55)..strokeWidth=.65;
+    for(final corner in [const Offset(6,6),Offset(size.width-6,6),Offset(6,size.height-6),Offset(size.width-6,size.height-6)]){
+      final dx=corner.dx<10 ? 1.0 : -1.0,dy=corner.dy<10 ? 1.0 : -1.0;
+      canvas.drawLine(corner,corner+Offset(dx*18,0),p);canvas.drawLine(corner,corner+Offset(0,dy*18),p);
     }
   }
-
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate)=>false;
 }

@@ -112,7 +112,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     .toList(),
                 onChanged: (v) => set(() => role = v!),
               ),
-              SwitchListTile(
+              TerminalToggle(
                 title: Text(widget.store.tr('ENABLED', '启用')),
                 value: enabled,
                 onChanged: (v) => set(() => enabled = v),
@@ -195,22 +195,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
                 onChanged: (v) => store.setLanguage(v!),
               ),
-              SwitchListTile(
+              TerminalToggle(
                 title: Text(store.tr('CRT / SCANLINE', 'CRT / 扫描线')),
                 value: store.crt,
                 onChanged: (v) => store.effects('crt', v),
               ),
-              SwitchListTile(
+              TerminalToggle(
                 title: Text(store.tr('VIDEO NOISE', '视频噪声')),
                 value: store.noise,
                 onChanged: (v) => store.effects('noise', v),
               ),
-              SwitchListTile(
+              TerminalToggle(
                 title: Text(store.tr('CHROMATIC SHIFT', '轻度色差')),
                 value: store.chromatic,
                 onChanged: (v) => store.effects('chromatic', v),
               ),
-              SwitchListTile(
+              TerminalToggle(
                 title: Text(store.tr('GLITCH', '轻度信号扰动')),
                 value: store.glitch,
                 onChanged: (v) => store.effects('glitch', v),
@@ -330,7 +330,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: Text(
                       '${member['role']} / ${member['enabled'] == true ? 'ENABLED' : 'DISABLED'}',
                     ),
-                    trailing: const Icon(Icons.chevron_right),
+                    trailing: const Text('>',style:TextStyle(color:muted,fontSize:10)),
                   ),
               ],
             ),

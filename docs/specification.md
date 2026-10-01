@@ -4,7 +4,7 @@
 
 面向最多五人在线的团队运维平台。单设施，服务端权威模拟，Flutter iOS 16+（iPhone / iPad）首发，Android 仅预留工程，Web 延后。中文与英文可切换。
 
-必须完整实现：Shell、Overview、Facility/Network Map、Camera、Device Inspector、Alerts、Logs；配套登录、成员及显示设置。真实 AI、Memory Core、Automation、Entity Tracker、Communication、摄像头和硬件接入不在本阶段。
+必须完整实现：Shell、Overview、Relocation、独立 Network Map、Camera、Device System Link、Alerts、Logs 和只读 Memory Ring；配套登录、成员及显示设置。真实 AI、独立长期知识/记忆写入、Automation、Entity Tracker、Communication、摄像头和硬件接入不在本阶段。
 
 ## 权限
 
@@ -22,7 +22,7 @@
 
 遥测每两秒更新，使用确定性波形；故障场景由管理员触发：DEV-01 输出故障、CAM-02 信号丢失、SEN-03 温度过高。没有不可复现的随机严重告警。
 
-观察 → 扫描身份和能力 → 服务端授权 Link → 显示设备面板 → 提交命令 → 显示结果。Link 默认闲置五分钟到期。高影响操作（断电、重启、恢复故障、网络连接切换）需显示所有依赖节点并二次确认，凭证 60 秒失效。
+观察 → 扫描身份和能力 → 客户端短 Pair 序列（已知界面可快速配对）→ 服务端授权 Link → 显示设备面板 → 提交命令 → 显示结果。Link 默认闲置五分钟到期。高影响操作（断电、重启、恢复故障、网络连接切换）需显示所有依赖节点并二次确认，凭证 60 秒失效。
 
 控制包括：电源、门禁、灯光亮度、摄像头 pan/tilt/zoom、适用节点的诊断、重启、故障恢复、网关连接切换。上游不可用时无法远程连接下游；仍可连接上游恢复供电/网络，禁止伪造可用控制通道。
 
@@ -39,3 +39,7 @@ ACTIVE → ACKNOWLEDGED → RESOLVED。ACK 记录接手人而不清除故障；�
 ## 交付
 
 仅 GitHub Actions 编译及自动化验证。产物是未签名 IPA、Ubuntu 镜像归档、Compose 包和部署说明。不自动部署或改 DNS，不承诺未签名 IPA 可以直接在普通 iPhone 上安装。
+
+## 第二轮 UI/UX 修订
+
+按用户明确要求，以开放黑场、空间站线框、真实感预渲染 Camera、设备专用终端和径向 Memory 关系场替代统一 Dashboard Panel。现有 42 个 Node、权限、模拟、状态、设备控制及保留策略不变。Memory 首轮只读投影来自现有持久化日志和 Node/edges；不表示已实现 AI、录音、录像或新的长期记忆服务。详见 design.md 和 ADR 0005。

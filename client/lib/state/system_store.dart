@@ -23,7 +23,7 @@ class SystemStore extends ChangeNotifier {
   String? error, selectedId, cameraId, scannedId, scanReceipt, linkId;
   String stage = 'OBSERVE';
   String language = 'zh';
-  bool crt = true, noise = false, chromatic = false, glitch = false;
+  bool crt = true, noise = true, chromatic = false, glitch = false;
   bool get canControl => user != null && user!['role'] != 'observer';
   bool get isAdmin => user?['role'] == 'admin';
   bool get linked => connected && linkId != null && scannedId == selectedId;
@@ -46,7 +46,7 @@ class SystemStore extends ChangeNotifier {
       if (address != null) api.base = Uri.parse(address);
       language = await vault.read(key: 'language') ?? 'zh';
       crt = await vault.read(key: 'crt') != 'false';
-      noise = await vault.read(key: 'noise') == 'true';
+      noise = await vault.read(key: 'noise') != 'false';
       chromatic = await vault.read(key: 'chromatic') == 'true';
       glitch = await vault.read(key: 'glitch') == 'true';
       api.token = await vault.read(key: 'token');

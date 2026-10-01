@@ -1,10 +1,11 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:sam_client/main.dart';
 import 'package:sam_client/data/api.dart';
 import 'package:sam_client/state/system_store.dart';
-import 'package:sam_client/ui/inspector.dart';
+import 'package:sam_client/ui/memory_core.dart';
 
 Future<void> waitFor(WidgetTester tester, Finder finder) async {
   for (var i = 0; i < 120; i++) {
@@ -43,24 +44,31 @@ void main() {
       await binding.takeScreenshot('02-alerts');
       await tester.ensureVisible(find.byKey(const ValueKey('locate-DEV-01')));
       await tester.tap(find.byKey(const ValueKey('locate-DEV-01')));
-      await waitFor(tester, find.text('DEV-01 // POWER'));
+      await waitFor(tester, find.byKey(const Key('relocate-camera')));
       expect(store.selectedId, 'DEV-01');
       await binding.takeScreenshot('03-facility-map');
       // Select the other camera in this module; the power outage affects both.
       // Camera still provides explicit no-signal telemetry, without fake vision.
-      await tester.tap(find.byKey(const Key('nav-2')));
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.byKey(const Key('relocate-camera')));
+      await tester.pump(const Duration(milliseconds: 400));
       expect(find.textContaining('NO SIGNAL'), findsWidgets);
       await binding.takeScreenshot('04-camera-offline');
-      await tester.tap(find.byKey(const Key('nav-1')));
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.tap(find.text('检查'));
+      await tester.tap(find.byKey(const Key('camera-system-link')));
       await waitFor(tester, find.byKey(const Key('scan-device')));
       await tester.ensureVisible(find.byKey(const Key('scan-device')));
       await tester.tap(find.byKey(const Key('scan-device')));
       await waitFor(tester, find.byKey(const Key('link-device')));
       await tester.ensureVisible(find.byKey(const Key('link-device')));
       await tester.tap(find.byKey(const Key('link-device')));
+      await waitFor(tester, find.byKey(const Key('pair-sequence')));
+      await tester.pump(const Duration(milliseconds: 400));
+      await binding.takeScreenshot('05a-pair-sequence');
+      final sequence = tester.widget<Text>(find.byKey(const Key('pair-sequence'))).data!.split(' / ').last.split(' ');
+      for(final glyph in sequence){
+        await tester.ensureVisible(find.byKey(ValueKey('pair-$glyph')));
+        await tester.tap(find.byKey(ValueKey('pair-$glyph')));
+        await tester.pump(const Duration(milliseconds: 150));
+      }
       await waitFor(tester, find.byKey(const Key('recover-device')));
       await binding.takeScreenshot('05-control-inspector');
       await tester.ensureVisible(find.byKey(const Key('recover-device')));
@@ -87,15 +95,40 @@ void main() {
         ),
         isTrue,
       );
-      Navigator.of(tester.element(find.byType(Inspector))).pop();
+      await tester.tap(find.byKey(const Key('close-system-link')));
       store.setCamera('CAM-01');
       await tester.pump(const Duration(milliseconds: 300));
       await tester.tap(find.byKey(const Key('nav-2')));
       await waitFor(tester, find.byKey(const ValueKey('target-DEV-02')));
       await binding.takeScreenshot('07-camera-online');
       await tester.tap(find.byKey(const ValueKey('target-DEV-02')));
-      await waitFor(tester, find.byKey(const Key('scan-device')));
+      await waitFor(tester, find.byKey(const Key('scan-target')));
+      expect(store.scannedId, isNull);
+      await tester.tap(find.byKey(const Key('scan-target')));
+      await waitFor(tester, find.byKey(const Key('link-device')));
       expect(store.selectedId, 'DEV-02');
+      expect(store.scannedId, 'DEV-02');
+      await tester.tap(find.byKey(const Key('close-system-link')));
+      await tester.tap(find.byKey(const Key('tab-7')));
+      await tester.pump(const Duration(milliseconds: 500));
+      await binding.takeScreenshot('08-network');
+      await tester.ensureVisible(find.byKey(const Key('tab-8')));
+      await tester.tap(find.byKey(const Key('tab-8')));
+      await tester.pump(const Duration(milliseconds: 500));
+      final ring = tester.getRect(find.byKey(const Key('memory-ring')));
+      final memories = memoryRecords(store);
+      final index = memories.indexWhere((r) => r.id == 'SYS.DEV-01');
+      final angle = index / memories.length * math.pi * 2 - math.pi / 2;
+      final radius = math.min(ring.width * .4, ring.height * .4);
+      await tester.tapAt(ring.center + Offset(math.cos(angle), math.sin(angle)) * radius);
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('MEMORY / SYS.DEV-01'), findsOneWidget);
+      await binding.takeScreenshot('09-memory-ring');
+      await tester.tap(find.byKey(const Key('nav-1')));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(find.byKey(const Key('module-systems')));
+      await tester.pump(const Duration(milliseconds: 400));
+      await binding.takeScreenshot('10-module-interior');
       expect(store.linked, isFalse);
       await store.suspend();
       expect(store.linked, isFalse);
