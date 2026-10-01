@@ -79,3 +79,6 @@ Camera 的 Feed 为主体，光学 Channel Selector 显示 A ACTIVE / B STANDBY 
 Alert Register 的 ACTIVE/QUEUE/UNACK 与历史独立。右侧 TIME × MODULE 矩阵展示真实模拟异常及三条明确标注 MOCK_HISTORY 的已解决种子事件，事件符号支持选择、详情和来源操作。模拟历史一次性添加到已有场景，不覆盖旧事件、故障或审计；重启不重复添加，Reset 保留历史，保留策略继续生效。resolved 为低亮灰色，未解决 warning/critical 使用现有 amber/red。最后 Soft Key 始终 HISTORY；详情另提供 OPEN AUDIT LOG。
 
 Memory 分类为 EVENT、OBSERVATION（设备识别审计）、SYSTEM（实时节点）、VISUAL（原创 Mock 资产）、FRAGMENT（安全事件片段）、CONSTRUCTED（模块成员投影），AUDIO 保留不可用状态。选中节点后 260ms 重排并高亮已有关系，RETURN 先返回 Memory 模块。元数据含 ID、来源、时间、类型、节点、关系数和置信度；没有源评分时明确 NOT SCORED。没有新增 AI 模型或独立长期记忆写入服务。
+
+
+纯界面反馈（Channel 切换、目标锁定等）以 INTERFACE 来源进入会话内日志，最多 128 条，登出/重置清空；日志明确标注 LOCAL SESSION，并可按 INTERFACE 搜索。它没有服务端 audit cursor，不冒充持久审计。Scan、Link、命令及故障的服务端审计保留原协议与保留期限。System Link 打开期间，宽屏背景也隐藏一级导航。

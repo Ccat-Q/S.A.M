@@ -36,19 +36,21 @@ class EventStream extends StatelessWidget {
                   style: TextStyle(fontSize: 9, color: muted),
                 ),
               for (var i = 0; i < events.length; i++)
-                Expanded(child: Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(
-                    '${_time(events[i]['time'])}  ${events[i]['category']} / ${events[i]['node_id'] ?? 'CORE'}\n${events[i]['message']}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 8,
-                      height: 1.35,
-                      color: accent.withValues(alpha: 1 - i * .26),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      '${_time(events[i]['time'])}  ${events[i]['category']} / ${events[i]['node_id'] ?? 'CORE'}\n${events[i]['message']}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 8,
+                        height: 1.35,
+                        color: accent.withValues(alpha: 1 - i * .26),
+                      ),
                     ),
                   ),
-                )),
+                ),
             ],
           ),
         ),

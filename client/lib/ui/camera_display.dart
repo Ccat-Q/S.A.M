@@ -24,8 +24,10 @@ class CameraDisplay extends StatelessWidget {
     required this.cameraId,
     required this.onTarget,
     this.thumbnail = false,
-    this.candidateId, this.identifiedId,
-    this.showReticle = false, this.scanning = false,
+    this.candidateId,
+    this.identifiedId,
+    this.showReticle = false,
+    this.scanning = false,
   });
   @override
   Widget build(BuildContext context) {
@@ -82,8 +84,14 @@ class CameraDisplay extends StatelessWidget {
                         0,
                       ]),
                       child: ImageFiltered(
-                        imageFilter: ui.ImageFilter.blur(sigmaX: store.crt ? .25 : 0, sigmaY: store.crt ? .25 : 0),
-                        child: OpticalImage(asset: cameraAsset(camera), lens: store.crt),
+                        imageFilter: ui.ImageFilter.blur(
+                          sigmaX: store.crt ? .25 : 0,
+                          sigmaY: store.crt ? .25 : 0,
+                        ),
+                        child: OpticalImage(
+                          asset: cameraAsset(camera),
+                          lens: store.crt,
+                        ),
                       ),
                     ),
                   ),
@@ -105,7 +113,10 @@ class CameraDisplay extends StatelessWidget {
                             SamTokens.blue,
                             BlendMode.color,
                           ),
-                          child: OpticalImage(asset: cameraAsset(camera), lens: store.crt),
+                          child: OpticalImage(
+                            asset: cameraAsset(camera),
+                            lens: store.crt,
+                          ),
                         ),
                       ),
                     ),
@@ -140,9 +151,20 @@ class CameraDisplay extends StatelessWidget {
                                   onTap: () => onTarget(t['node_id'] as String),
                                   child: CustomPaint(
                                     painter: _TargetMarker(
-                                      selected: showReticle && candidateId == t['node_id'],
-                                      identified: identifiedId == t['node_id'] && (showReticle || scanning),
-                                      color: scanning ? ink : statusColor(store.nodes[t['node_id']]?.status ?? 'UNKNOWN'),
+                                      selected:
+                                          showReticle &&
+                                          candidateId == t['node_id'],
+                                      identified:
+                                          identifiedId == t['node_id'] &&
+                                          (showReticle || scanning),
+                                      color: scanning
+                                          ? ink
+                                          : statusColor(
+                                              store
+                                                      .nodes[t['node_id']]
+                                                      ?.status ??
+                                                  'UNKNOWN',
+                                            ),
                                     ),
                                   ),
                                 ),
@@ -253,7 +275,11 @@ class CameraDisplay extends StatelessWidget {
 class _TargetMarker extends CustomPainter {
   final bool selected, identified;
   final Color color;
-  _TargetMarker({required this.selected, required this.identified, required this.color});
+  _TargetMarker({
+    required this.selected,
+    required this.identified,
+    required this.color,
+  });
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
@@ -287,12 +313,27 @@ class _TargetMarker extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _TargetMarker oldDelegate) =>
-      selected != oldDelegate.selected || identified != oldDelegate.identified || color != oldDelegate.color;
+      selected != oldDelegate.selected ||
+      identified != oldDelegate.identified ||
+      color != oldDelegate.color;
 }
 
 Rect _targetRect(Map<String, dynamic> target, Size size, bool lens) {
-  final rect = lensTarget(Rect.fromLTWH((target['x'] as num).toDouble(), (target['y'] as num).toDouble(), (target['width'] as num).toDouble(), (target['height'] as num).toDouble()), lens);
-  return Rect.fromLTWH(rect.left * size.width, rect.top * size.height, rect.width * size.width, rect.height * size.height);
+  final rect = lensTarget(
+    Rect.fromLTWH(
+      (target['x'] as num).toDouble(),
+      (target['y'] as num).toDouble(),
+      (target['width'] as num).toDouble(),
+      (target['height'] as num).toDouble(),
+    ),
+    lens,
+  );
+  return Rect.fromLTWH(
+    rect.left * size.width,
+    rect.top * size.height,
+    rect.width * size.width,
+    rect.height * size.height,
+  );
 }
 
 class _CameraFrame extends CustomPainter {

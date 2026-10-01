@@ -76,10 +76,15 @@ class _VideoPainter extends CustomPainter {
           ),
       );
       final area = Offset.zero & size;
-      canvas.drawRect(area, Paint()..shader = RadialGradient(
-        colors: [Colors.transparent, Colors.black.withValues(alpha: .15)],
-        stops: const [.35, 1], radius: .9,
-      ).createShader(area));
+      canvas.drawRect(
+        area,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [Colors.transparent, Colors.black.withValues(alpha: .15)],
+            stops: const [.35, 1],
+            radius: .9,
+          ).createShader(area),
+      );
     }
     if (noise) {
       final random = math.Random((cycle.value * 144).floor());
@@ -97,7 +102,14 @@ class _VideoPainter extends CustomPainter {
       }
       p.color = Colors.black.withValues(alpha: .055);
       for (var i = 0; i < 80; i++) {
-        canvas.drawCircle(Offset(random.nextDouble() * size.width, random.nextDouble() * size.height), .5, p);
+        canvas.drawCircle(
+          Offset(
+            random.nextDouble() * size.width,
+            random.nextDouble() * size.height,
+          ),
+          .5,
+          p,
+        );
       }
       // Compression/field ghosting belongs to the optical image, never text.
       final y = size.height * ((cycle.value * 2) % 1);

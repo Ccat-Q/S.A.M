@@ -108,7 +108,7 @@ class LogLines extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: Text(
-            '${e['time']}\n${e['category']} // ${e['node_id'] ?? 'CORE'} // ${e['message']}\n${e['actor'] ?? 'SYSTEM'}${e['correlation_id'] == null ? '' : ' / ${e['correlation_id']}'}',
+            '${e['time']}\n${e['category']} // ${e['node_id'] ?? 'CORE'} // ${e['message']}\n${e['category'] == 'INTERFACE' ? 'LOCAL SESSION / ' : ''}${e['actor'] ?? 'SYSTEM'}${e['correlation_id'] == null ? '' : ' / ${e['correlation_id']}'}',
             style: TextStyle(
               fontSize: 10,
               color: e['category'] == 'ALERT' ? warning : muted,
@@ -138,6 +138,19 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Future<void> search({bool more = false}) async {
+    if (category == 'INTERFACE') {
+      final from = DateTime.tryParse(since), to = DateTime.tryParse(until);
+      if ((since.isNotEmpty && from == null) || (until.isNotEmpty && to == null)) {
+        SystemMessages.shared.emit('FAULT / INVALID ISO-8601 TIME', error: true);
+        return;
+      }
+      setState(() => result = widget.store.interfaceEvents.where((e) {
+        final time = DateTime.parse(e['time'] as String);
+        return (node.isEmpty || e['node_id'] == node) && (e['message'] as String).toLowerCase().contains(query.toLowerCase())
+          && (from == null || !time.isBefore(from)) && (to == null || !time.isAfter(to));
+      }).toList());
+      return;
+    }
     setState(() => loading = true);
     await report(context, () async {
       final data =
@@ -169,9 +182,9 @@ class _LogsScreenState extends State<LogsScreen> {
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
-    final live = store.logs
-        .where((e) => node.isEmpty || e['node_id'] == node)
-        .toList();
+    final live = [...store.logs, ...store.interfaceEvents]
+        .where((e) => (node.isEmpty || e['node_id'] == node) && (category.isEmpty || e['category'] == category))
+        .toList()..sort((a,b) => (b['time'] as String).compareTo(a['time'] as String));
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -216,6 +229,7 @@ class _LogsScreenState extends State<LogsScreen> {
                         'SECURITY',
                         'USER',
                         'TELEMETRY',
+                        'INTERFACE',
                       ]
                       .map(
                         (x) => DropdownMenuItem(
@@ -260,10 +274,10 @@ class _LogsScreenState extends State<LogsScreen> {
         ),
         const SizedBox(height: 16),
         Panel(
-          title: result == null ? 'LIVE STREAM' : 'HISTORY',
+          title: result == null ? 'LIVE STREAM / SERVER + LOCAL INTERFACE' : category == 'INTERFACE' ? 'LOCAL SESSION / INTERFACE' : 'HISTORY / SERVER AUDIT',
           child: LogLines(result ?? live),
         ),
-        if (result != null)
+        if (result != null && category != 'INTERFACE')
           OutlinedButton(
             onPressed: loading ? null : () => search(more: true),
             child: Text(store.tr('LOAD EARLIER', '加载更早记录')),

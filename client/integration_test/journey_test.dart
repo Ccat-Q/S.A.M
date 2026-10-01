@@ -31,6 +31,11 @@ void main() {
         api: SamApi('http://localhost:8000'),
         persist: false,
       );
+      addTearDown(() async {
+        await store.suspend();
+        await tester.pumpWidget(const SizedBox.shrink());
+        store.dispose();
+      });
       await tester.pumpWidget(SamApp(store: store));
       await waitFor(tester, find.byKey(const Key('login')));
       await tester.enterText(find.byKey(const Key('username')), 'admin');
@@ -44,7 +49,9 @@ void main() {
         await tester.pump(const Duration(milliseconds: 100));
       }
       expect(store.connected, isTrue);
-      final initialUptime = tester.widget<Text>(find.byKey(const Key('system-uptime'))).data;
+      final initialUptime = tester
+          .widget<Text>(find.byKey(const Key('system-uptime')))
+          .data;
       await tester.pump(const Duration(milliseconds: 500));
       await binding.takeScreenshot('01-overview');
       await tester.tap(find.byKey(const Key('tab-3')));
@@ -137,7 +144,10 @@ void main() {
       final feed = tester.getRect(find.byKey(const Key('optical-feed')));
       final shell = tester.getRect(find.byType(SystemShell));
       expect(feed.height / shell.height, greaterThan(.7));
-      expect(tester.widget<Text>(find.byKey(const Key('optical-target-state'))).data, 'OBSERVE / ACQUIRE TARGET');
+      expect(
+        tester.widget<Text>(find.byKey(const Key('optical-target-state'))).data,
+        'OBSERVE / ACQUIRE TARGET',
+      );
       await tester.tap(find.byKey(const Key('soft-ANGLE')));
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('C    N/A'), findsOneWidget);
@@ -159,6 +169,7 @@ void main() {
       expect(store.selectedId, 'DEV-02');
       expect(store.scannedId, 'DEV-02');
       await tester.tap(find.byKey(const Key('close-system-link')));
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byKey(const Key('soft-EXIT')));
       await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byKey(const Key('tab-7')));
@@ -187,11 +198,21 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       await binding.takeScreenshot('10-module-interior');
       await tester.tap(find.byKey(const Key('tab-0')));
-      for (var i = 0; i < 80 && !store.displayEvents.any((e) => e['category'] == 'TELEMETRY'); i++) {
+      for (
+        var i = 0;
+        i < 80 && !store.displayEvents.any((e) => e['category'] == 'TELEMETRY');
+        i++
+      ) {
         await tester.pump(const Duration(milliseconds: 100));
       }
-      expect(store.displayEvents.any((e) => e['category'] == 'TELEMETRY'), isTrue);
-      expect(tester.widget<Text>(find.byKey(const Key('system-uptime'))).data, isNot(initialUptime));
+      expect(
+        store.displayEvents.any((e) => e['category'] == 'TELEMETRY'),
+        isTrue,
+      );
+      expect(
+        tester.widget<Text>(find.byKey(const Key('system-uptime'))).data,
+        isNot(initialUptime),
+      );
       await tester.pump(const Duration(milliseconds: 500));
       await binding.takeScreenshot('11-overview-live');
       expect(store.linked, isFalse);

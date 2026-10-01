@@ -20,6 +20,18 @@ class SystemStore extends ChangeNotifier {
   // Bounded live display queue. These are received events, never command grants
   // or substitute audit records; telemetry stays out of the persistent log UI.
   List<Map<String, dynamic>> displayEvents = [];
+  // Ephemeral interface feedback, explicitly separate from server audit/cursors.
+  List<Map<String, dynamic>> interfaceEvents = [];
+  int _interfaceSequence = 0;
+  void recordInterface(String message, {bool fault = false}) {
+    interfaceEvents.insert(0, {
+      'cursor': 'UI.${++_interfaceSequence}', 'time': DateTime.now().toUtc().toIso8601String(),
+      'category': 'INTERFACE', 'node_id': selectedId, 'message': message,
+      'actor': user?['username'], 'data': {'source': 'CLIENT_INTERFACE', 'persisted': false, 'fault': fault},
+    });
+    if (interfaceEvents.length > 128) interfaceEvents.removeRange(128, interfaceEvents.length);
+    notifyListeners();
+  }
   Map<String, dynamic> cameraTargets = {};
   int cursor = 0, generation = 1, tick = 0;
   bool connected = false, busy = false, initialized = false, paused = false;
@@ -142,6 +154,7 @@ class SystemStore extends ChangeNotifier {
     if (oldGeneration != generation) {
       clearLink();
       displayEvents.clear();
+      interfaceEvents.clear();
     }
   }
 
@@ -212,7 +225,7 @@ class SystemStore extends ChangeNotifier {
         final eventCursor = event['cursor'] as int;
         final data = event['data'] as Map;
         final eventGeneration = data['generation'] as int? ?? generation;
-        if (eventGeneration > generation) displayEvents.clear();
+        if (eventGeneration > generation) { displayEvents.clear(); interfaceEvents.clear(); }
         if (eventGeneration >= generation &&
             !displayEvents.any((e) => e['cursor'] == eventCursor) &&
             (event['category'] != 'TELEMETRY' ||
@@ -482,6 +495,7 @@ class SystemStore extends ChangeNotifier {
     alerts = [];
     logs = [];
     displayEvents = [];
+    interfaceEvents = [];
     clearLink();
     if (persist) await vault.delete(key: 'token');
     notifyListeners();

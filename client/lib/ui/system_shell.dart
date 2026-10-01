@@ -23,6 +23,7 @@ class _SystemShellState extends State<SystemShell> {
   String? logNode;
   bool fullscreen = false;
   bool operation = false;
+  bool systemLink = false;
   final uptimeClock = Stopwatch()..start();
   Timer? clock;
   static const names = [
@@ -39,6 +40,7 @@ class _SystemShellState extends State<SystemShell> {
   @override
   void initState() {
     super.initState();
+    SystemMessages.shared.addListener(recordFeedback);
     clock = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -47,7 +49,13 @@ class _SystemShellState extends State<SystemShell> {
   @override
   void dispose() {
     clock?.cancel();
+    SystemMessages.shared.removeListener(recordFeedback);
     super.dispose();
+  }
+
+  void recordFeedback() {
+    final messages = SystemMessages.shared;
+    if (messages.message != null) widget.store.recordInterface(messages.message!, fault: messages.fault);
   }
 
   void navigate(int next) {
@@ -92,6 +100,7 @@ class _SystemShellState extends State<SystemShell> {
   Future<void> inspect(String id) async {
     final store = widget.store;
     store.selectNode(id);
+    setState(() => systemLink = true);
     await showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -165,6 +174,7 @@ class _SystemShellState extends State<SystemShell> {
         );
       },
     );
+    if (mounted) setState(() => systemLink = false);
   }
 
   void modules() => showGeneralDialog<void>(
@@ -303,7 +313,7 @@ class _SystemShellState extends State<SystemShell> {
                   ),
                 ),
               ),
-              if (!fullscreen && page != 2 && !operation)
+              if (!fullscreen && page != 2 && !operation && !systemLink)
                 Container(
                   decoration: const BoxDecoration(
                     border: Border(bottom: BorderSide(color: line, width: .6)),
