@@ -7,8 +7,10 @@ mkdir "$PACKAGE_DIR/Payload"
 test -d client/build/ios/iphoneos/Runner.app
 cp -R client/build/ios/iphoneos/Runner.app "$PACKAGE_DIR/Payload/SAM.app"
 test -f "$PACKAGE_DIR/Payload/SAM.app/Runner"
+xcrun lipo -verify_arch arm64 "$PACKAGE_DIR/Payload/SAM.app/Runner"
 /usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$PACKAGE_DIR/Payload/SAM.app/Info.plist"
 /usr/libexec/PlistBuddy -c 'Print MinimumOSVersion' "$PACKAGE_DIR/Payload/SAM.app/Info.plist"
+test "$(/usr/libexec/PlistBuddy -c 'Print MinimumOSVersion' "$PACKAGE_DIR/Payload/SAM.app/Info.plist")" = '16.0'
 # --no-codesign also covers bundled frameworks. Never strip or fabricate signatures.
 if codesign --verify --deep --strict "$PACKAGE_DIR/Payload/SAM.app" 2>/dev/null; then
   echo 'Unexpected signed application; unsigned artifact contract violated' >&2

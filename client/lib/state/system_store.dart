@@ -83,9 +83,19 @@ class SystemStore extends ChangeNotifier {
     } finally { busy = false; notifyListeners(); }
   }
 
-  void loadSnapshot(Map<String, dynamic> state) {
+  void loadSnapshot(Map<String, dynamic> state, {bool authoritative = false}) {
+    final nextGeneration = state['generation'] as int;
+    final nextCursor = state['cursor'] as int;
+    if (!authoritative && (nextGeneration < generation ||
+        nextGeneration == generation && nextCursor < cursor)) return;
     final oldGeneration = generation;
+    final previous = nodes;
     nodes = {for (final item in state['nodes'] as List) item['id'] as String: Node(Map<String, dynamic>.from(item as Map))};
+    if (!authoritative && oldGeneration == nextGeneration) {
+      for (final n in previous.values) {
+        if (nodes.containsKey(n.id) && n.version > nodes[n.id]!.version) nodes[n.id] = n;
+      }
+    }
     edges = (state['edges'] as List).map((x) => Map<String, dynamic>.from(x as Map)).toList();
     alerts = (state['alerts'] as List).map((x) => Map<String, dynamic>.from(x as Map)).toList();
     cameraTargets = Map<String, dynamic>.from(state['camera_targets'] as Map);
@@ -98,7 +108,7 @@ class SystemStore extends ChangeNotifier {
 
   Future<void> synchronize() async {
     final state = Map<String, dynamic>.from(await api.call('GET', '/api/snapshot') as Map);
-    loadSnapshot(state);
+    loadSnapshot(state, authoritative: !connected);
     logs = (await api.call('GET', '/api/logs') as List).map((x) => Map<String, dynamic>.from(x as Map)).toList();
     await _connect();
     notifyListeners();
@@ -106,6 +116,7 @@ class SystemStore extends ChangeNotifier {
 
   Future<void> _connect() async {
     if (_disposed || user == null) return;
+    connected = false; clearLink(); notifyListeners();
     _retry?.cancel();
     final epoch = ++_epoch;
     await _subscription?.cancel();
@@ -120,30 +131,44 @@ class SystemStore extends ChangeNotifier {
       connected = true; error = null;
       _subscription = socket.stream.listen((raw) {
         if (epoch != _epoch) return;
-        final packet = jsonDecode(raw as String) as Map;
-        if (packet['type'] == 'snapshot') {
-          loadSnapshot(Map<String, dynamic>.from(packet['snapshot'] as Map));
-        } else {
-          for (final event in packet['events'] as List) {
-            final data = event['data'] as Map;
-            if (data['generation'] != null && data['generation'] != generation) {
-              generation = data['generation'] as int; clearLink();
-            }
-            if (data['nodes'] != null) {
-              for (final n in data['nodes'] as List) { nodes[n['id'] as String] = Node(Map<String, dynamic>.from(n as Map)); }
-            }
-            if (data['alerts'] != null) alerts = (data['alerts'] as List).map((x) => Map<String, dynamic>.from(x as Map)).toList();
-            if (data['paused'] != null) paused = data['paused'] as bool;
-            if (data['tick'] != null) tick = data['tick'] as int;
-            if (event['category'] != 'TELEMETRY') logs.insert(0, Map<String, dynamic>.from(event as Map));
-          }
-          cursor = packet['cursor'] as int;
-          if (logs.length > 200) logs = logs.take(200).toList();
-        }
-        notifyListeners();
+        receivePacket(Map<String, dynamic>.from(jsonDecode(raw as String) as Map));
       }, onError: (Object e) => _lost(epoch), onDone: () => _lost(epoch));
       notifyListeners();
     } catch (_) { _lost(epoch); }
+  }
+
+  void receivePacket(Map<String, dynamic> packet) {
+    if (packet['type'] == 'snapshot') {
+      loadSnapshot(Map<String, dynamic>.from(packet['snapshot'] as Map), authoritative: true);
+    } else {
+      for (final raw in packet['events'] as List) {
+        final event = Map<String, dynamic>.from(raw as Map);
+        final eventCursor = event['cursor'] as int;
+        final data = event['data'] as Map;
+        final eventGeneration = data['generation'] as int? ?? generation;
+        // An HTTP snapshot may already include these queued stream events.
+        // Preserve their logs, but never roll back the snapshot or command state.
+        if (eventCursor > cursor && eventGeneration >= generation) {
+          final reset = eventGeneration != generation;
+          if (reset) { generation = eventGeneration; clearLink(); }
+          if (data['nodes'] != null) {
+            for (final rawNode in data['nodes'] as List) {
+              final n = Node(Map<String, dynamic>.from(rawNode as Map));
+              if (reset || n.version >= (nodes[n.id]?.version ?? 0)) nodes[n.id] = n;
+            }
+          }
+          if (data['alerts'] != null) alerts = (data['alerts'] as List).map((x) => Map<String, dynamic>.from(x as Map)).toList();
+          if (data['paused'] != null) paused = data['paused'] as bool;
+          if (data['tick'] != null) tick = data['tick'] as int;
+        }
+        if (event['category'] != 'TELEMETRY' && !logs.any((e) => e['cursor'] == eventCursor)) logs.add(event);
+        if (eventCursor > cursor) cursor = eventCursor;
+      }
+      if ((packet['cursor'] as int) > cursor) cursor = packet['cursor'] as int;
+      logs.sort((a, b) => (b['cursor'] as int).compareTo(a['cursor'] as int));
+      if (logs.length > 200) logs = logs.take(200).toList();
+    }
+    notifyListeners();
   }
 
   void _lost(int epoch) {

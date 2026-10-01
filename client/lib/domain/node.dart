@@ -9,10 +9,14 @@ class Node {
   String get status => data['status'] as String;
   int get version => data['version'] as int;
   String? get fault => data['fault'] as String?;
-  List<String> get capabilities => List<String>.from(data['capabilities'] as List);
-  Map<String, dynamic> get controls => Map<String, dynamic>.from(data['controls'] as Map);
-  Map<String, dynamic> get telemetry => Map<String, dynamic>.from(data['telemetry'] as Map);
-  Map<String, dynamic> get metadata => Map<String, dynamic>.from(data['metadata'] as Map);
+  List<String> get capabilities =>
+      List<String>.from(data['capabilities'] as List);
+  Map<String, dynamic> get controls =>
+      Map<String, dynamic>.from(data['controls'] as Map);
+  Map<String, dynamic> get telemetry =>
+      Map<String, dynamic>.from(data['telemetry'] as Map);
+  Map<String, dynamic> get metadata =>
+      Map<String, dynamic>.from(data['metadata'] as Map);
   double get x => (data['position']['x'] as num).toDouble();
   double get y => (data['position']['y'] as num).toDouble();
 }

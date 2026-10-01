@@ -1,0 +1,65 @@
+name: Prepare cached Flutter client
+description: Pinned toolchain, native policy and locked dependencies
+outputs:
+  xcode-key:
+    description: Compilation cache identity
+    value: ${{ steps.xcode-cache.outputs.cache-primary-key }}
+  xcode-hit:
+    description: Exact compilation cache hit
+    value: ${{ steps.xcode-cache.outputs.cache-hit }}
+runs:
+  using: composite
+  steps:
+    - uses: subosito/flutter-action@v2
+      id: flutter
+      with:
+        flutter-version: '3.47.5'
+        channel: stable
+        cache: true
+        cache-key: 'sam-sdk-v1-:os:-:arch:-:version:-:sha256:'
+        pub-cache: true
+        pub-cache-key: sam-pub-v1-:os:-:arch:-:version:-${{ hashFiles('client/pubspec.lock') }}
+    - name: Save SDK before building
+      if: steps.flutter.outputs.CACHE-HIT != 'true'
+      uses: actions/cache/save@v5
+      continue-on-error: true
+      with:
+        path: ${{ steps.flutter.outputs.CACHE-PATH }}
+        key: ${{ steps.flutter.outputs.CACHE-KEY }}
+    - name: Identify Xcode
+      id: xcode
+      shell: bash
+      run: echo "version=$(xcodebuild -version | shasum -a 256 | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+    - uses: actions/cache@v5
+      with:
+        path: |
+          ~/Library/Caches/CocoaPods
+          ~/.cocoapods/repos
+        key: sam-pods-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.xcode.outputs.version }}-${{ hashFiles('client/pubspec.lock', 'scripts/native_projects.py') }}
+        restore-keys: sam-pods-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.xcode.outputs.version }}-
+    - name: Restore native compilation cache
+      id: xcode-cache
+      uses: actions/cache/restore@v5
+      with:
+        path: ~/Library/Developer/Xcode/DerivedData
+        key: sam-xcode-v2-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-flutter-3.47.5-${{ steps.xcode.outputs.version }}-${{ hashFiles('client/pubspec.lock', 'scripts/native_projects.py') }}-${{ github.sha }}
+        restore-keys: sam-xcode-v2-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-flutter-3.47.5-${{ steps.xcode.outputs.version }}-${{ hashFiles('client/pubspec.lock', 'scripts/native_projects.py') }}-
+    - name: Generate native projects and original icon
+      shell: bash
+      run: |
+        mkdir -p artifacts
+        python3 scripts/native_projects.py
+        swift scripts/icon.swift
+    - name: Format and resolve locked dependencies
+      shell: bash
+      working-directory: client
+      run: |
+        dart format lib test integration_test test_driver
+        flutter pub get --enforce-lockfile
+    - name: Save Pub dependencies before testing
+      if: steps.flutter.outputs.PUB-CACHE-HIT != 'true'
+      uses: actions/cache/save@v5
+      continue-on-error: true
+      with:
+        path: ${{ steps.flutter.outputs.PUB-CACHE-PATH }}
+        key: ${{ steps.flutter.outputs.PUB-CACHE-KEY }}

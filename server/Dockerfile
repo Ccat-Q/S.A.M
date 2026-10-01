@@ -1,8 +1,10 @@
 FROM python:3.12-slim
 WORKDIR /app
 COPY pyproject.toml ./
+# Dependency installation is isolated from application source changes.
+RUN python -c 'import subprocess, sys, tomllib; deps = tomllib.load(open("pyproject.toml", "rb"))["project"]["dependencies"]; subprocess.check_call([sys.executable, "-m", "pip", "install", "--no-cache-dir", *deps])'
 COPY src ./src
-RUN pip install --no-cache-dir . && useradd --uid 10001 --create-home sam
+RUN pip install --no-cache-dir --no-deps . && useradd --uid 10001 --create-home sam
 COPY alembic.ini ./
 COPY migrations ./migrations
 USER sam

@@ -12,6 +12,7 @@ concurrency:
 jobs:
   server:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     services:
       postgres:
         image: postgres:16.9-alpine
@@ -34,18 +35,31 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: server/pyproject.toml
       - run: pip install -e '.[test]'
       - run: ruff check src tests
       - run: alembic upgrade head
       - run: pytest -v --junitxml=results.xml
       - name: Export API contract
         run: python -c 'import json; from sam.api import app; open("../docs/openapi.json", "w").write(json.dumps(app.openapi(), indent=2))'
-      - name: Build deployment artifacts
+      - uses: docker/setup-buildx-action@v4
+      - name: Build cached deployment image
+        uses: docker/build-push-action@v7
+        with:
+          context: server
+          load: true
+          push: false
+          tags: |
+            sam-server:${{ github.sha }}
+            sam-server:latest
+          cache-from: type=gha,scope=sam-server
+          cache-to: type=gha,scope=sam-server,mode=max
+      - name: Package deployment artifacts
         working-directory: .
         run: |
           mkdir -p artifacts
-          docker build -t sam-server:${GITHUB_SHA} -t sam-server:latest server
-          docker save sam-server:${GITHUB_SHA} sam-server:latest | gzip > artifacts/sam-server.tar.gz
+          docker save sam-server:${GITHUB_SHA} sam-server:latest | gzip -1 > artifacts/sam-server.tar.gz
           cp -r deploy artifacts/deploy
           cp docs/deployment.md artifacts/deploy/README.md
           printf '%s\n' "$GITHUB_SHA" > artifacts/COMMIT
@@ -53,41 +67,70 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ubuntu-server
+          compression-level: 0
           path: |
             artifacts/
             docs/openapi.json
             server/results.xml
-  ios:
+  ios-build:
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 14
     steps:
       - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: ./.github/actions/prepare-client
+        id: client
+      - name: Analyze and verify client
+        working-directory: client
+        run: |
+          flutter analyze
+          flutter test --reporter expanded
+      - name: Build unsigned device application
+        working-directory: client
+        run: python3 ../scripts/run_with_deadline.py --seconds 360 flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
+      - name: Package and verify unsigned IPA
+        run: bash scripts/package_ipa.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          flutter-version: '3.47.5'
-          channel: stable
-          cache: true
+          name: ios-client
+          compression-level: 0
+          path: |
+            artifacts/sam-unsigned.ipa
+            artifacts/IPA-CONTENTS.txt
+            artifacts/IPA-SHA256.txt
+            client/lib/
+            client/test/
+            client/test_driver/
+            client/integration_test/
+            client/assets/
+            client/ios/
+            client/android/
+            client/pubspec.lock
+          if-no-files-found: warn
+      - name: Save native compilation cache
+        if: always() && steps.client.outputs.xcode-key != '' && steps.client.outputs.xcode-hit != 'true'
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: actions/cache/save@v5
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData
+          key: ${{ steps.client.outputs.xcode-key }}
+  ios-integration:
+    runs-on: macos-15
+    timeout-minutes: 14
+    env:
+      SAM_DATABASE_URL: postgresql+psycopg://sam:ci-only-password@localhost:5432/sam
+      SAM_SIMULATION_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/prepare-client
+        id: client
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Prepare native projects
-        run: |
-          mkdir -p artifacts
-          python3 scripts/native_projects.py
-          swift scripts/icon.swift
-      - name: Format source for review
-        working-directory: client
-        run: dart format lib test integration_test test_driver
-      - name: Resolve, analyze, and test
-        working-directory: client
-        run: |
-          flutter pub get
-          flutter analyze
-          flutter test --reporter expanded
-      - name: Start integration service
-        env:
-          SAM_DATABASE_URL: postgresql+psycopg://sam:ci-only-password@localhost:5432/sam
-          SAM_SIMULATION_ENABLED: 'false'
+          cache: pip
+          cache-dependency-path: server/pyproject.toml
+      - name: Start isolated integration service
         run: |
           brew list postgresql@16 >/dev/null 2>&1 || brew install postgresql@16
           brew services start postgresql@16
@@ -102,36 +145,50 @@ jobs:
           uvicorn sam.api:app --host 127.0.0.1 --port 8000 --no-access-log > ../artifacts/integration-api.log 2>&1 &
           for attempt in {1..30}; do curl -fsS http://127.0.0.1:8000/health && break; sleep 1; done
       - name: Boot simulator and verify operator journey
-        timeout-minutes: 20
+        timeout-minutes: 9
         working-directory: client
         run: |
           DEVICE_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for v in d["devices"].values() for x in v if x["name"].startswith("iPhone")))')
           xcrun simctl boot "$DEVICE_ID" || true
-          python3 -c 'import subprocess,sys; subprocess.run(["xcrun", "simctl", "bootstatus", sys.argv[1], "-b"], check=True, timeout=240)' "$DEVICE_ID"
-          flutter drive --driver=test_driver/journey_driver.dart --target=integration_test/journey_test.dart -d "$DEVICE_ID" --dart-define=SAM_CI=true 2>&1 | tee ../artifacts/ios-journey.log
-      - name: Build unsigned device application
-        working-directory: client
-        run: flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
-      - name: Package and verify unsigned IPA
-        run: bash scripts/package_ipa.sh
+          python3 ../scripts/run_with_deadline.py --seconds 120 xcrun simctl bootstatus "$DEVICE_ID" -b
+          python3 ../scripts/run_with_deadline.py --seconds 360 flutter drive --verbose --driver=test_driver/journey_driver.dart --target=integration_test/journey_test.dart -d "$DEVICE_ID" --dart-define=SAM_CI=true 2>&1 | tee ../artifacts/ios-journey.log
+      - name: Capture simulator diagnostics
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 1
+        run: |
+          mkdir -p artifacts/screenshots
+          python3 scripts/run_with_deadline.py --seconds 15 xcrun simctl io booted screenshot artifacts/screenshots/simulator-final.png
+          python3 scripts/run_with_deadline.py --seconds 20 xcrun simctl spawn booted log show --last 3m --style compact --predicate 'process == "Runner"' > artifacts/simulator.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ios-client
+          name: ios-validation
+          compression-level: 0
           path: |
-            artifacts/sam-unsigned.ipa
-            artifacts/IPA-CONTENTS.txt
-            artifacts/IPA-SHA256.txt
             artifacts/screenshots/
             artifacts/integration-api.log
             artifacts/ios-journey.log
-            client/lib/
-            client/test/
-            client/test_driver/
-            client/integration_test/
-            client/assets/
-            client/ios/
-            client/android/
-            client/pubspec.lock
+            artifacts/simulator.log
             client/build/integration_test/
           if-no-files-found: warn
+      - name: Save native compilation cache
+        if: always() && steps.client.outputs.xcode-key != '' && steps.client.outputs.xcode-hit != 'true'
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: actions/cache/save@v5
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData
+          key: ${{ steps.client.outputs.xcode-key }}
+  deadline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enforce workflow execution budget
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/actions_deadline.py

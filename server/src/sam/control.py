@@ -40,9 +40,16 @@ def recompute(scene):
         offline |= new
     for n in nodes.values():
         status = "OFFLINE" if n["id"] in offline else "DEGRADED" if n["fault"] else "ONLINE"
+        previous_status = n["status"]
         if n["status"] != status:
             n["status"] = status
             n["version"] += 1
+        if status == "OFFLINE":
+            n["telemetry"].update(signal=0, fps=0)
+        elif previous_status == "OFFLINE":
+            n["telemetry"].update(signal=92, fps=30)
+        if n["fault"] == "THERMAL_HIGH":
+            n["telemetry"]["temperature"] = 86.0
     active_conditions = {}
     for n in nodes.values():
         reason = n["fault"] or ("NODE_UNAVAILABLE" if n["status"] == "OFFLINE" else None)
@@ -145,6 +152,8 @@ def execute(db, scene, user, req):
     failed = n["fault"] == "OUTPUT_FAILURE" and req.action == "power" and req.value is True
     if not failed and req.action != "diagnostic":
         if req.action in ("restart", "recover"):
+            if n["fault"] == "THERMAL_HIGH":
+                n["telemetry"]["temperature"] = 34.0
             n["fault"] = None
             n["controls"].update(power=True, connected=True)
             n["telemetry"]["uptime"] = 0

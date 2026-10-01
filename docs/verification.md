@@ -1,6 +1,21 @@
 # 验收与 CI
 
-所有编译、静态分析和自动化测试仅在 GitHub Actions 进行。`.github/workflows/ci.yml` 分开执行 Ubuntu 服务端与 macOS iOS 工作。
+所有编译、静态分析和自动化测试仅在 GitHub Actions 进行。`.github/workflows/ci.yml` 并行执行 `server`、`ios-build` 和 `ios-integration`：模拟器测试异常不会阻塞 IPA 构建。`ios-client` 交付 IPA 与可审阅源码/原生配置，`ios-validation` 交付联机截图与诊断日志。
+
+## 时间预算
+
+目标总运行时间约 10 分钟，上限 15 分钟。服务端作业最多 10 分钟，两项 iOS 作业最多 14 分钟；`deadline` 监控整轮工作，在运行开始 14 分钟时强制取消仍未完成的构建，给终止留出时间。该作业仅有读取源码和取消本次 Actions 的权限。
+
+模拟器启动最多 120 秒；Flutter 构建/驱动单次最多 360 秒，超时先终止整个进程组，5 秒后仍不退出则强制结束。失败照常记录为失败，保存诊断而不放宽验收。GitHub 队列、平台故障及 runner 的清理时间由平台控制；首次冷缓存可能比后续慢，但受同样预算约束。
+
+## 构建缓存
+
+- Python pip 按平台、Python 版本及 `server/pyproject.toml` 恢复下载缓存，安装与测试仍执行。
+- Flutter SDK 按 OS、CPU、版本和发行包摘要缓存；Pub 按版本与 `pubspec.lock` 缓存。SDK/依赖就绪后立即保存，后续模拟器失败不会丢失这两层缓存；依赖解析使用 `--enforce-lockfile`。
+- CocoaPods 缓存下载与索引；Xcode DerivedData 按构建/验收用途、OS/CPU、Flutter、Xcode、依赖与原生配置隔离，每个提交保存增量版本。缓存恢复后仍执行正常编译及验收，不直接交付缓存应用，不缓存模拟器数据、数据库、账号、Token 或最终 IPA。
+- Docker Buildx 使用 GitHub Actions 构建层缓存，依赖安装层与应用代码层分离。镜像采用快速 gzip，已压缩产物上传时关闭二次压缩。
+
+首次运行填充缓存；后续查看各缓存步骤的命中记录、Docker `CACHED` 输出与步骤耗时。更换工具链/依赖自动失效；需要强制清除时提高 `.github/actions/prepare-client/action.yml` 中对应缓存键的版本。缓存不绕过任何构建或测试要求。
 
 ## 必须通过
 
@@ -9,7 +24,7 @@
 - 输出故障传播到摄像头等依赖；ACK 不解决故障；SCAN/LINK/确认恢复后告警自动解决。
 - 过期 Link、过期确认、影响节点变化、场景重置、成员禁用均拒绝旧控制。
 - WebSocket 事件重放、无效游标快照恢复、断开后撤销 Link。
-- Flutter 控制门控、只读 Inspector、断线禁控、reset 清除旧授权、HTTPS 校验。
+- Flutter 控制门控、只读 Inspector、断线禁控、reset 清除旧授权、HTTPS 校验；已获取快照后到达的旧推送不得回退状态，重复事件不得重复显示日志。
 - iOS 模拟器连接真实 FastAPI/PostgreSQL，执行告警 → 地图 → 摄像头（断电时 NO SIGNAL）→ SCAN → LINK → 恢复 → 告警历史与审计。
 - CI 检查迁移、构建镜像、构建设备版应用，并验证 IPA 结构及无完整签名。
 - iOS 联机测试导出概览、告警、地图、离线摄像头、控制面板及影响确认截图；CI 产物同时保留格式化源码、依赖锁和生成的原生配置供审阅。

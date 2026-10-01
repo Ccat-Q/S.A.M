@@ -17,6 +17,40 @@ Map<String, dynamic> fixture() => {'nodes': [
 ], 'edges': [], 'alerts': [], 'camera_targets': {}, 'generation': 1, 'cursor': 2, 'tick': 0, 'paused': false};
 
 void main() {
+  test('queued stream events cannot roll back an HTTP snapshot or duplicate logs', () {
+    final store = SystemStore(persist: false)..loadSnapshot(fixture());
+    final oldNode = Map<String, dynamic>.from((fixture()['nodes'] as List).first as Map)
+      ..['version'] = 1 ..['status'] = 'OFFLINE';
+    final packet = <String, dynamic>{'type': 'events', 'cursor': 1, 'events': [
+      {'cursor': 1, 'category': 'DEVICE', 'message': 'OLD EVENT', 'data': {
+        'generation': 1, 'nodes': [oldNode], 'tick': 99, 'paused': true,
+      }},
+    ]};
+    store.receivePacket(packet);
+    store.receivePacket(packet);
+    expect(store.nodes['DEV-01']!.status, 'ONLINE');
+    expect(store.cursor, 2);
+    expect(store.tick, 0);
+    expect(store.paused, isFalse);
+    expect(store.logs.length, 1);
+    // A newer stream cursor can still carry an older control version if an
+    // HTTP command result has arrived ahead of its corresponding stream event.
+    store.receivePacket({'type': 'events', 'cursor': 3, 'events': [
+      {'cursor': 3, 'category': 'TELEMETRY', 'data': {'generation': 1, 'nodes': [oldNode]}},
+    ]});
+    expect(store.nodes['DEV-01']!.version, 2);
+    store.loadSnapshot(fixture()..['cursor'] = 1 ..['tick'] = 50);
+    expect(store.cursor, 3);
+    expect(store.tick, 0);
+    store.linkId = 'old-grant';
+    store.receivePacket({'type': 'events', 'cursor': 4, 'events': [
+      {'cursor': 4, 'category': 'SYSTEM', 'data': {'generation': 2, 'nodes': [oldNode]}},
+    ]});
+    expect(store.generation, 2);
+    expect(store.nodes['DEV-01']!.version, 1);
+    expect(store.linkId, isNull);
+    store.dispose();
+  });
   test('reset invalidates grants and both maps reference the same identity', () {
     final store = SystemStore(persist: false);
     store.loadSnapshot(fixture());

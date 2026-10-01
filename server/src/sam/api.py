@@ -170,7 +170,7 @@ def create_link(body: LinkRequest, request: Request, user=Depends(require_operat
 def revoke_link(ident: str, user=Depends(current_user)):
     with transaction() as db:
         link = db.get(Link, ident)
-        if link and link.user_id == user.id:
+        if link and link.user_id == user.id and link.session_hash == user.auth_session_hash:
             link.revoked = True
     return {"ok": True}
 

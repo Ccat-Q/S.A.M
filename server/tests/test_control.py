@@ -50,6 +50,9 @@ def test_alert_ack_control_recovery(client, admin):
     client.post("/api/simulation", headers=admin, json={"action": "scenario"})
     snap = client.get("/api/snapshot", headers=admin).json()
     alert = next(a for a in snap["alerts"] if a["node_id"] == "DEV-01")
+    camera = next(n for n in snap["nodes"] if n["id"] == "CAM-01")
+    assert camera["telemetry"]["signal"] == 0 and camera["telemetry"]["fps"] == 0
+    assert next(n for n in snap["nodes"] if n["id"] == "SEN-03")["telemetry"]["temperature"] == 86.0
     ack = client.post(f"/api/alerts/{alert['id']}/acknowledge", headers=admin).json()
     assert ack["state"] == "ACKNOWLEDGED"
     req = request_for(client, admin, "DEV-01", "recover", None)
@@ -59,6 +62,7 @@ def test_alert_ack_control_recovery(client, admin):
     snap = client.get("/api/snapshot", headers=admin).json()
     assert next(a for a in snap["alerts"] if a["id"] == alert["id"])["state"] == "RESOLVED"
     assert next(n for n in snap["nodes"] if n["id"] == "CAM-01")["status"] == "ONLINE"
+    assert next(n for n in snap["nodes"] if n["id"] == "CAM-01")["telemetry"]["fps"] == 30
     logs = client.get("/api/logs", headers=admin, params={"node_id": "DEV-01"}).json()
     assert any(e["correlation_id"] == result.json()["id"] for e in logs)
 
@@ -134,6 +138,8 @@ def test_link_belongs_to_login_session_not_just_member(client, admin):
     a, b = login(client, "operator"), login(client, "operator")
     req = request_for(client, a)
     assert client.post("/api/commands", headers=b, json=req).json()["detail"] == "LINK_REQUIRED"
+    # Another login of the same member must not revoke this session's grant.
+    client.delete(f"/api/links/{req['link_id']}", headers=b)
     with client.websocket_connect("/api/stream?after=0", headers=b) as ws:
         ws.receive_json()
         ws.send_text("close")
