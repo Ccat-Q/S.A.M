@@ -1,0 +1,120 @@
+name: Build and verify S.A.M.
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: sam-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  server:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16.9-alpine
+        env:
+          POSTGRES_USER: sam
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: sam
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U sam" --health-interval 5s
+          --health-timeout 5s --health-retries 20
+    env:
+      SAM_DATABASE_URL: postgresql+psycopg://sam:ci-only-password@localhost:5432/sam
+      SAM_SIMULATION_ENABLED: 'false'
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -e '.[test]'
+      - run: ruff check src tests
+      - run: alembic upgrade head
+      - run: pytest -v --junitxml=results.xml
+      - name: Export API contract
+        run: python -c 'import json; from sam.api import app; open("../docs/openapi.json", "w").write(json.dumps(app.openapi(), indent=2))'
+      - name: Build deployment artifacts
+        working-directory: .
+        run: |
+          mkdir -p artifacts
+          docker build -t sam-server:${GITHUB_SHA} -t sam-server:latest server
+          docker save sam-server:${GITHUB_SHA} sam-server:latest | gzip > artifacts/sam-server.tar.gz
+          cp -r deploy artifacts/deploy
+          cp docs/deployment.md artifacts/deploy/README.md
+          printf '%s\n' "$GITHUB_SHA" > artifacts/COMMIT
+          sha256sum artifacts/sam-server.tar.gz > artifacts/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-server
+          path: |
+            artifacts/
+            docs/openapi.json
+            server/results.xml
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+          cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare native projects
+        run: python3 scripts/native_projects.py
+      - name: Resolve, analyze, and test
+        working-directory: client
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test --reporter expanded
+      - name: Start integration service
+        env:
+          SAM_DATABASE_URL: postgresql+psycopg://sam:ci-only-password@localhost:5432/sam
+          SAM_SIMULATION_ENABLED: 'false'
+        run: |
+          brew services start postgresql@16
+          export PATH="$(brew --prefix postgresql@16)/bin:$PATH"
+          for attempt in {1..30}; do pg_isready && break; sleep 1; done
+          psql postgres -c "CREATE USER sam WITH PASSWORD 'ci-only-password';"
+          createdb -O sam sam
+          pip install -e 'server[test]'
+          cd server
+          alembic upgrade head
+          python ../scripts/ci_members.py
+          uvicorn sam.api:app --host 127.0.0.1 --port 8000 --no-access-log > /tmp/sam-api.log 2>&1 &
+          for attempt in {1..30}; do curl -fsS http://127.0.0.1:8000/health && break; sleep 1; done
+      - name: Boot simulator and verify operator journey
+        working-directory: client
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for v in d["devices"].values() for x in v if x["name"].startswith("iPhone")))')
+          xcrun simctl boot "$DEVICE_ID" || true
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+          flutter test integration_test/journey_test.dart -d "$DEVICE_ID" --dart-define=SAM_CI=true
+      - name: Build unsigned device application
+        working-directory: client
+        run: flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
+      - name: Package and verify unsigned IPA
+        run: bash scripts/package_ipa.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-client
+          path: |
+            artifacts/sam-unsigned.ipa
+            artifacts/IPA-CONTENTS.txt
+            client/ios/
+            client/android/
+            client/pubspec.lock
+            client/build/integration_test/
+          if-no-files-found: warn

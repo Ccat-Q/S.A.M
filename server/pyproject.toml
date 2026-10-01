@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sam-server"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi==0.115.12", "uvicorn[standard]==0.34.2",
+  "SQLAlchemy==2.0.40", "psycopg[binary]==3.2.6",
+  "pydantic-settings==2.9.1", "pwdlib[argon2]==0.2.1", "alembic==1.15.2",
+]
+
+[project.optional-dependencies]
+test = ["pytest==8.3.5", "httpx==0.28.1", "websockets==15.0.1", "ruff==0.11.8"]
+
+[project.scripts]
+sam-admin = "sam.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

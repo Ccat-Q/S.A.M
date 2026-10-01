@@ -1,0 +1,17 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.db
+client/.dart_tool/
+client/build/
+client/.flutter-plugins-dependencies
+client/ios/Pods/
+client/ios/.symlinks/
+client/ios/Flutter/Generated.xcconfig
+client/ios/Flutter/flutter_export_environment.sh
+client/android/.gradle/
+client/android/local.properties
+artifacts/
+*.ipa

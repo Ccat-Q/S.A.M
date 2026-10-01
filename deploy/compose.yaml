@@ -1,0 +1,47 @@
+services:
+  database:
+    image: postgres:16.9-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sam
+      POSTGRES_DB: sam
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - sam-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U sam -d sam"]
+      interval: 5s
+      retries: 20
+  migrate:
+    image: ${SAM_IMAGE:-sam-server:latest}
+    environment:
+      SAM_DATABASE_URL: postgresql+psycopg://sam:${POSTGRES_PASSWORD}@database:5432/sam
+    depends_on:
+      database:
+        condition: service_healthy
+    command: [alembic, upgrade, head]
+  api:
+    image: ${SAM_IMAGE:-sam-server:latest}
+    restart: unless-stopped
+    environment:
+      SAM_DATABASE_URL: postgresql+psycopg://sam:${POSTGRES_PASSWORD}@database:5432/sam
+      SAM_LOG_RETENTION_DAYS: ${SAM_LOG_RETENTION_DAYS:-30}
+      SAM_AUDIT_RETENTION_DAYS: ${SAM_AUDIT_RETENTION_DAYS:-90}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      retries: 10
+  tunnel:
+    image: cloudflare/cloudflared:2026.9.0
+    restart: unless-stopped
+    command: [tunnel, --no-autoupdate, run]
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?Set TUNNEL_TOKEN}
+    depends_on:
+      api:
+        condition: service_healthy
+volumes:
+  sam-data:
