@@ -30,6 +30,7 @@ def user_for_token(token):
         user = db.get(User, session.user_id) if session else None
         if not session or aware(session.expires_at) <= now() or not user or not user.enabled:
             raise HTTPException(401, "SESSION_EXPIRED")
+        user.auth_session_hash = session.token_hash
         return user
 
 

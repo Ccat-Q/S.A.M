@@ -199,7 +199,11 @@ class SystemStore extends ChangeNotifier {
       final result = await api.call('POST', '/api/links', body: {'node_id': id, 'generation': generation, 'scan_id': scanReceipt}) as Map;
       if (selectedId != id || !connected) { await api.call('DELETE', '/api/links/${result['id']}'); return; }
       linkId = result['id'] as String; stage = 'ESTABLISHED';
-    } catch (_) { stage = 'IDENTIFIED'; rethrow; }
+    } catch (e) {
+      if (e is ApiError && (e.code == 'SCAN_REQUIRED' || e.code == 'SCENE_CHANGED')) { clearLink(); }
+      else { stage = 'IDENTIFIED'; }
+      rethrow;
+    }
     finally { notifyListeners(); }
   }
 
@@ -219,12 +223,10 @@ class SystemStore extends ChangeNotifier {
     try {
       Map result;
       try { result = await api.call('POST', '/api/commands', body: request) as Map; }
-      on TimeoutException {
+      catch (e) {
+        if (e is ApiError) rethrow;
         try { result = await api.call('GET', '/api/commands/by-key/${request['key']}') as Map; }
-        on ApiError catch (e) {
-          if (e.status == 404) throw ApiError(409, 'COMMAND_OUTCOME_UNKNOWN');
-          rethrow;
-        }
+        catch (_) { throw ApiError(409, 'COMMAND_OUTCOME_UNKNOWN'); }
       }
       final n = Map<String, dynamic>.from(result['node'] as Map);
       nodes[n['id'] as String] = Node(n);

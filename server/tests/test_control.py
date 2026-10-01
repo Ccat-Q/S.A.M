@@ -112,3 +112,36 @@ def test_snapshot_recovery_and_failure(client, admin):
     result = client.post("/api/commands", headers=admin, json=req).json()
     assert result["state"] == "FAILED"
     assert client.get(f"/api/commands/by-key/{req['key']}", headers=admin).json()["id"] == result["id"]
+
+
+def test_restart_preserves_state_and_audit_but_invalidates_link(client, admin):
+    from fastapi.testclient import TestClient
+    from sam.api import app
+    req = request_for(client, admin)
+    result = client.post("/api/commands", headers=admin, json=req).json()
+    with TestClient(app) as restarted:
+        snap = restarted.get("/api/snapshot", headers=admin).json()
+        assert next(n for n in snap["nodes"] if n["id"] == "DEV-02")["controls"]["door"] == "open"
+        assert restarted.get(f"/api/commands/by-key/{req['key']}", headers=admin).json()["id"] == result["id"]
+        assert restarted.post("/api/commands", headers=admin, json={**req, "key": str(uuid4()), "expected_version": 2}).json()["detail"] == "LINK_REQUIRED"
+
+
+def test_link_belongs_to_login_session_not_just_member(client, admin):
+    a, b = login(client, "operator"), login(client, "operator")
+    req = request_for(client, a)
+    assert client.post("/api/commands", headers=b, json=req).json()["detail"] == "LINK_REQUIRED"
+    with client.websocket_connect("/api/stream?after=0", headers=b) as ws:
+        ws.receive_json()
+        ws.send_text("close")
+    assert client.post("/api/commands", headers=a, json=req).status_code == 200
+
+
+def test_scan_receipt_cannot_cross_sessions_and_log_filters(client, admin):
+    a, b = login(client, "operator"), login(client, "operator")
+    scan = client.post("/api/nodes/DEV-02/scan", headers=a).json()
+    request = {"node_id": "DEV-02", "scan_id": scan["scan_id"], "generation": scan["generation"]}
+    assert client.post("/api/links", headers=b, json=request).json()["detail"] == "SCAN_REQUIRED"
+    records = client.get("/api/logs", headers=admin, params={"node_id": "DEV-02", "category": "DEVICE", "q": "IDENTIFIED"}).json()
+    assert len(records) == 1
+    assert records[0]["actor"] == "operator"
+    assert client.get("/api/logs", headers=admin, params={"since": "2026-01-01"}).status_code == 422

@@ -78,7 +78,7 @@ def changes(db, scene, before, category, message, ident=None, actor=None, correl
 
 def validate(db, scene, user, req):
     link = db.get(Link, req.link_id)
-    if not link or link.user_id != user.id or link.node_id != req.node_id or link.revoked or link.generation != scene.generation:
+    if not link or link.user_id != user.id or link.session_hash != user.auth_session_hash or link.node_id != req.node_id or link.revoked or link.generation != scene.generation:
         raise HTTPException(409, "LINK_REQUIRED")
     if aware(link.last_used) + timedelta(seconds=settings.link_idle_seconds) <= now():
         raise HTTPException(409, "LINK_EXPIRED")

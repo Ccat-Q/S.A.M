@@ -83,6 +83,7 @@ jobs:
           SAM_DATABASE_URL: postgresql+psycopg://sam:ci-only-password@localhost:5432/sam
           SAM_SIMULATION_ENABLED: 'false'
         run: |
+          brew list postgresql@16 >/dev/null 2>&1 || brew install postgresql@16
           brew services start postgresql@16
           export PATH="$(brew --prefix postgresql@16)/bin:$PATH"
           for attempt in {1..30}; do pg_isready && break; sleep 1; done

@@ -2,10 +2,11 @@ import asyncio
 import contextlib
 import logging
 import time
-from collections import defaultdict, deque
+from collections import OrderedDict, deque
 from contextlib import asynccontextmanager
 from copy import deepcopy
 from datetime import timedelta
+from threading import Lock
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
@@ -24,7 +25,8 @@ from .seed import initial_scene
 from .store import SessionFactory, emit, event_dict, locked_scene, snapshot, transaction
 
 logger = logging.getLogger(__name__)
-login_attempts = defaultdict(deque)
+login_attempts = OrderedDict()
+login_lock = Lock()
 
 
 @asynccontextmanager
@@ -64,7 +66,8 @@ def health():
 def authorized_scene(db, user, admin=False):
     scene = locked_scene(db)
     current = db.get(User, user.id)
-    if not current or not current.enabled:
+    session = db.get(Session, user.auth_session_hash)
+    if not current or not current.enabled or not session or aware(session.expires_at) <= now():
         raise HTTPException(401, "SESSION_EXPIRED")
     allowed = ("admin",) if admin else ("admin", "operator")
     if current.role not in allowed:
@@ -76,13 +79,19 @@ def authorized_scene(db, user, admin=False):
 def login(body: LoginRequest, request: Request):
     # Do not trust X-Forwarded-For; cloudflared is the sole published entrance.
     key = body.username.lower()
-    attempts = login_attempts[key]
     at = time.monotonic()
-    while attempts and attempts[0] < at - 60:
-        attempts.popleft()
-    if len(attempts) >= 10:
-        raise HTTPException(429, "LOGIN_RATE_LIMIT")
-    attempts.append(at)
+    with login_lock:
+        if key not in login_attempts:
+            if len(login_attempts) >= 2048:
+                login_attempts.popitem(last=False)
+            login_attempts[key] = deque()
+        attempts = login_attempts[key]
+        login_attempts.move_to_end(key)
+        while attempts and attempts[0] < at - 60:
+            attempts.popleft()
+        if len(attempts) >= 10:
+            raise HTTPException(429, "LOGIN_RATE_LIMIT")
+        attempts.append(at)
     with transaction() as db:
         user = authenticate(db, body.username, body.password)
         result = issue_session(db, user)
@@ -100,7 +109,7 @@ def logout(request: Request, user=Depends(current_user)):
     token = request.headers["authorization"].split(" ", 1)[1]
     with transaction() as db:
         db.execute(delete(Session).where(Session.token_hash == token_hash(token)))
-        for link in db.scalars(select(Link).where(Link.user_id == user.id)):
+        for link in db.scalars(select(Link).where(Link.session_hash == token_hash(token))):
             link.revoked = True
         emit(db, "SECURITY", "MEMBER DISCONNECTED", actor=user.username)
     return {"ok": True}
