@@ -11,6 +11,7 @@ import 'package:sam_client/ui/theme.dart';
 import 'package:sam_client/ui/system_shell.dart';
 import 'package:sam_client/ui/camera_screen.dart';
 import 'package:sam_client/ui/terminal_actions.dart';
+import 'package:sam_client/ui/alert_screen.dart';
 
 Map<String, dynamic> fixture() => {
   'nodes': [
@@ -335,6 +336,35 @@ void main() {
       store.dispose();
     },
   );
+  testWidgets('anomaly matrix retains older resolved events beyond twelve rows', (tester) async {
+    final data = fixture();
+    data['alerts'] = [for (var i = 0; i < 28; i++) {
+      'id': 'history-$i', 'node_id': 'DEV-01', 'condition': 'MOCK_${i.toString().padLeft(2, '0')}',
+      'severity': 'WARNING', 'state': 'RESOLVED', 'source': 'MOCK_HISTORY',
+      'created_at': '2026-10-01T00:${i.toString().padLeft(2, '0')}:00Z', 'resolution': 'RESTORED',
+    }];
+    final store = SystemStore(persist: false)..loadSnapshot(data);
+    store.connected = true;
+    await tester.pumpWidget(MaterialApp(theme: samTheme(), home: SystemShell(store: store)));
+    await tester.tap(find.byKey(const Key('tab-3')));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('NO ACTIVE EXCEPTIONS'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('soft-HISTORY')));
+    await tester.pump();
+    final scroll = find.descendant(of: find.byType(AnomalyMatrix), matching: find.byType(SingleChildScrollView));
+    await tester.drag(scroll, const Offset(0, -900));
+    await tester.pump(const Duration(seconds: 1));
+    final rect = tester.getRect(find.byKey(const Key('anomaly-matrix')));
+    await tester.tapAt(rect.topLeft + const Offset(75, 750));
+    await tester.pump();
+    expect(find.text('MOCK 00'), findsOneWidget);
+    expect(find.byKey(const Key('tab-0')), findsNothing);
+    await tester.tap(find.byKey(const Key('alert-register-return')));
+    await tester.pump();
+    expect(find.byKey(const Key('tab-0')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    store.dispose();
+  });
   testWidgets(
     'optical entry does not inherit identification; scan stays in feed',
     (tester) async {
@@ -396,6 +426,10 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       await tester.pump();
+      for (var i = 0; i < 20 && find.textContaining('CLASS POWER').evaluate().isEmpty; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(store.stage, 'IDENTIFIED');
       expect(find.textContaining('CLASS POWER'), findsOneWidget);
       expect(store.linked, isFalse);
       expect(terminals, 0);

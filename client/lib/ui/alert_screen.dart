@@ -139,15 +139,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
               final wide = box.maxWidth >= 700;
               final leftWidth = box.maxWidth * (wide ? .44 : .52);
               final matrixWidth = box.maxWidth * (wide ? .46 : .43);
-              final visibleEvents =
-                  (history
-                          ? events
-                          : [
-                              ...active,
-                              ...events.where((a) => a['state'] == 'RESOLVED'),
-                            ])
-                      .take(12)
-                      .toList();
+        final visibleEvents = events;
               return Stack(
                 children: [
                   Positioned(
@@ -361,11 +353,15 @@ class AnomalyMatrix extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) => LayoutBuilder(
-    builder: (_, box) => GestureDetector(
+    builder: (_, box) {
+      final contentHeight = math.max(box.maxHeight, events.length * 26.0 + 64);
+      return SingleChildScrollView(child: SizedBox(
+        height: contentHeight,
+        child: GestureDetector(
       key: const Key('anomaly-matrix'),
       behavior: HitTestBehavior.opaque,
       onTapUp: (e) {
-        final height = math.max(1.0, box.maxHeight - 64);
+        final height = math.max(1.0, contentHeight - 64);
         final row =
             ((e.localPosition.dy - 48) / (height / math.max(1, events.length)))
                 .round();
@@ -373,10 +369,11 @@ class AnomalyMatrix extends StatelessWidget {
           onSelect(events[row]['id'] as String);
       },
       child: CustomPaint(
-        size: Size(box.maxWidth, box.maxHeight),
+        size: Size(box.maxWidth, contentHeight),
         painter: _AnomalyMatrixPainter(store, events, selected),
       ),
-    ),
+    )));
+    },
   );
 }
 

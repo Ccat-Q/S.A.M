@@ -167,8 +167,10 @@ class _MemoryCoreScreenState extends State<MemoryCoreScreen>
           'ALL',
           ...records.map((r) => r.type).toSet(),
         ]);
-        if (type != null && mounted) setState(() => filter = type);
-        if (mounted && selected.isNotEmpty) selectMemory('');
+        if (type != null && mounted) {
+          setState(() => filter = type);
+          if (selected.isNotEmpty) selectMemory('');
+        }
       },
       'TRACE': current?.nodeId == null
           ? null
