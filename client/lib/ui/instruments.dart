@@ -216,7 +216,10 @@ class SoftKey extends StatelessWidget {
                 color: selected ? color : line,
               ),
               const SizedBox(height: 6),
-              Text(
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
                 '${code.isEmpty ? '' : '$code / '}$label',
                 maxLines: 1,
                 style: TextStyle(
@@ -228,6 +231,7 @@ class SoftKey extends StatelessWidget {
                   fontFamily: 'RobotoCondensed',
                   fontSize: 11,
                   letterSpacing: 1,
+                ),
                 ),
               ),
             ],
