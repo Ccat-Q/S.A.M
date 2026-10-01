@@ -35,7 +35,7 @@ services:
       interval: 10s
       retries: 10
   tunnel:
-    image: cloudflare/cloudflared:2026.9.0
+    image: cloudflare/cloudflared:2026.9.3
     restart: unless-stopped
     command: [tunnel, --no-autoupdate, run]
     environment:

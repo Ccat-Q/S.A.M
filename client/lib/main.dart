@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'state/system_store.dart';
 import 'ui/inspector.dart';
 import 'ui/instruments.dart';
 import 'ui/screens.dart';
 import 'ui/settings.dart';
 import 'ui/theme.dart';
+import 'ui/errors.dart';
 
 void main() { WidgetsFlutterBinding.ensureInitialized(); runApp(SamApp(store: SystemStore())); }
 
@@ -28,6 +30,8 @@ class _SamAppState extends State<SamApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) => AnimatedBuilder(animation: widget.store, builder: (_, __) => MaterialApp(
     debugShowCheckedModeBanner: false, title: 'S.A.M.', theme: samTheme(),
+    locale: Locale(widget.store.language), supportedLocales: const [Locale('zh'), Locale('en')],
+    localizationsDelegates: GlobalMaterialLocalizations.delegates,
     home: !widget.store.initialized ? const Scaffold(body: Center(child: Text('INITIALIZING CORE…')))
       : widget.store.user == null ? LoginScreen(store: widget.store) : SystemShell(store: widget.store),
   ));
@@ -65,7 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
           Reading('CORE LINK', store.connected ? 'ESTABLISHED' : 'CONNECTING'),
           TextButton(onPressed: () => setState(() => skipBoot = true), child: const Text('SKIP BOOT')),
         ],
-        if (store.error != null) Text(store.error!, style: const TextStyle(color: critical, fontSize: 11)),
+        if (store.error != null) Text(explainError(store.error!, store.language == 'zh'), style: const TextStyle(color: critical, fontSize: 11)),
       ])),
       const SizedBox(height: 20), Text(store.tr('Authorized operators only. Hardware and vision are simulated.', '仅限授权成员。当前硬件与视觉均为模拟。'), style: const TextStyle(color: muted, fontSize: 10)),
       TextButton(onPressed: () => store.setLanguage(store.language == 'zh' ? 'en' : 'zh'), child: Text(store.language == 'zh' ? 'ENGLISH' : '简体中文')),
@@ -144,14 +148,30 @@ class _SystemShellState extends State<SystemShell> {
       ])),
       if (wide && !fullscreen) Container(height: 95, width: double.infinity, decoration: const BoxDecoration(border: Border(top: BorderSide(color: line))), padding: const EdgeInsets.symmetric(horizontal: 16),
         child: SingleChildScrollView(child: LogLines(store.logs.take(2).toList()))),
-    ])), bottomNavigationBar: wide || fullscreen ? null : Container(decoration: const BoxDecoration(border: Border(top: BorderSide(color: line))),
-      child: SafeArea(top: false, child: Row(children: [for (var i = 0; i < 5; i++) Expanded(child: TextButton(
-        key: ValueKey('nav-$i'), onPressed: () {
-          if (i < 4) { setState(() => page = i); }
-          else { showModalBottomSheet<void>(context: context, backgroundColor: surface, shape: const RoundedRectangleBorder(), builder: (sheetContext) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
-            for (var j = 4; j < 7; j++) ListTile(leading: Icon(icons[j]), title: Text(destinations[j]), onTap: () { Navigator.pop(sheetContext); setState(() => page = j); }),
-          ]))); }
-        }, child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(i == 4 ? Icons.more_horiz : icons[i], size: 18, color: page == i || i == 4 && page >= 4 ? accent : muted),
-          const SizedBox(height: 4), Text(i == 4 ? store.tr('MORE', '更多') : destinations[i], style: TextStyle(fontSize: 9, color: page == i ? accent : muted))]))]))));
+    ])), bottomNavigationBar: wide || fullscreen ? null : _bottomNavigation(destinations, icons));
+  }
+  Widget _bottomNavigation(List<String> destinations, List<IconData> icons) {
+    return Container(
+      decoration: const BoxDecoration(border: Border(top: BorderSide(color: line))),
+      child: SafeArea(top: false, child: Row(children: [
+        for (var i = 0; i < 5; i++) Expanded(child: TextButton(
+          key: ValueKey('nav-$i'),
+          onPressed: () {
+            if (i < 4) { setState(() => page = i); return; }
+            showModalBottomSheet<void>(context: context, backgroundColor: surface,
+              shape: const RoundedRectangleBorder(),
+              builder: (sheetContext) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+                for (var j = 4; j < 7; j++) ListTile(leading: Icon(icons[j]), title: Text(destinations[j]),
+                  onTap: () { Navigator.pop(sheetContext); setState(() => page = j); }),
+              ])));
+          },
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Icon(i == 4 ? Icons.more_horiz : icons[i], size: 18, color: page == i || i == 4 && page >= 4 ? accent : muted),
+            const SizedBox(height: 4),
+            Text(i == 4 ? widget.store.tr('MORE', '更多') : destinations[i], style: TextStyle(fontSize: 9, color: page == i ? accent : muted)),
+          ]),
+        )),
+      ])),
+    );
   }
 }

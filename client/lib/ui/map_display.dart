@@ -10,8 +10,8 @@ Map<String, Offset> nodePositions(Iterable<Node> nodes, bool network) {
   for (var module = 1; module <= 4; module++) {
     final origin = Offset((module - 1) % 2 * 590.0 + 25, (module - 1) ~/ 2 * 410.0 + 20);
     final members = nodes.where((n) => n.module == 'MOD-${module.toString().padLeft(2, '0')}' && n.type != 'MODULE').toList();
-    for (var i = 0; i < members.length; i++) {
-      positions[members[i].id] = origin + Offset(80 + i % 4 * 130.0, 100 + i ~/ 4 * 83.0);
+    for (final n in members) {
+      positions[n.id] = origin + Offset(n.x * 550, n.y * 380);
     }
     positions['MOD-${module.toString().padLeft(2, '0')}'] = origin + const Offset(82, 30);
   }

@@ -35,6 +35,10 @@ def initial_scene():
                                         "signal": 92, "fps": 30, "uptime": 0},
                           "metadata": {"model": f"SAM-{subtype}-SIM", "firmware": "1.0.0",
                                        "simulated": True}, "last_command": None})
+    for module in range(1, 5):
+        members = [n for n in nodes if n["module_id"] == f"MOD-{module:02}" and n["type"] != "MODULE"]
+        for i, n in enumerate(members):
+            n["position"] = {"x": .1 + (i % 4) * .24, "y": .24 + (i // 4) * .21}
     edges = []
     for node in nodes:
         if node["id"] not in ("NET-01", "MOD-01", "MOD-02", "MOD-03", "MOD-04"):

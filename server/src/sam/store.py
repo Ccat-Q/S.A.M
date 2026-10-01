@@ -1,12 +1,13 @@
 from copy import deepcopy
 from contextlib import contextmanager
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import create_engine, delete, func, select
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm.attributes import flag_modified
 
 from .config import settings
-from .models import Command, Confirmation, Event, Link, Scene, Session, now
+from .models import Command, Confirmation, Event, Link, Scan, Scene, Session, now
 from .seed import initial_scene
 
 engine = create_engine(settings.database_url, pool_pre_ping=True)
@@ -56,10 +57,17 @@ def snapshot(db):
 
 def purge(db):
     at = now()
+    scene = locked_scene(db)
+    cutoff = at - timedelta(days=settings.audit_retention_days)
+    scene.data["alerts"] = [a for a in scene.data["alerts"] if a["state"] != "RESOLVED"
+                            or datetime.fromisoformat(a["resolved_at"]) >= cutoff]
+    scene.data = deepcopy(scene.data)
+    flag_modified(scene, "data")
     db.execute(delete(Event).where(Event.created_at < at - timedelta(days=settings.audit_retention_days)))
     db.execute(delete(Event).where(Event.category.not_in(["USER", "SECURITY", "COMMAND", "ALERT"]),
                                   Event.created_at < at - timedelta(days=settings.log_retention_days)))
     db.execute(delete(Command).where(Command.created_at < at - timedelta(days=settings.audit_retention_days)))
     db.execute(delete(Session).where(Session.expires_at < at))
     db.execute(delete(Confirmation).where(Confirmation.expires_at < at))
+    db.execute(delete(Scan).where(Scan.expires_at < at))
     db.execute(delete(Link).where(Link.last_used < at - timedelta(seconds=settings.link_idle_seconds)))

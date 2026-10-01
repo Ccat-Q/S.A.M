@@ -16,6 +16,12 @@ class _CameraDisplayState extends State<CameraDisplay> with SingleTickerProvider
   @override
   void initState() { super.initState(); pulse = AnimationController(vsync: this, duration: const Duration(seconds: 6))..repeat(); }
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.of(context).disableAnimations) { pulse.stop(); }
+    else if (!pulse.isAnimating) { pulse.repeat(); }
+  }
+  @override
   void dispose() { pulse.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) {
@@ -28,7 +34,7 @@ class _CameraDisplayState extends State<CameraDisplay> with SingleTickerProvider
       final zoom = (camera.controls['zoom'] as num).toDouble();
       final pan = (camera.controls['pan'] as num).toDouble() / 90 * size.width * 0.15;
       final tilt = (camera.controls['tilt'] as num).toDouble() / 45 * size.height * 0.15;
-      final matrix = Matrix4.identity()..translate(size.width / 2 + pan, size.height / 2 + tilt)..scale(zoom)..translate(-size.width / 2, -size.height / 2);
+      final matrix = Matrix4.diagonal3Values(zoom, zoom, 1)..setTranslationRaw(size.width * (1 - zoom) / 2 + pan, size.height * (1 - zoom) / 2 + tilt, 0);
       return ClipRect(child: Stack(children: [
         Positioned.fill(child: Transform(transform: matrix, child: AnimatedBuilder(animation: pulse, builder: (_, __) => CustomPaint(
           painter: FacilityPainter(widget.store, camera.id, motionReduced ? 0 : pulse.value))))),
@@ -62,6 +68,7 @@ class FacilityPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xff101c1b));
+    if (store.nodes[cameraId]?.status == 'OFFLINE') return;
     final pen = Paint()..color = const Color(0xff324a44)..strokeWidth = 1..style = PaintingStyle.stroke;
     final center = Offset(size.width * .52, size.height * .46);
     final inner = Rect.fromCenter(center: center, width: size.width * .48, height: size.height * .45);

@@ -22,6 +22,7 @@ class MemberUpdate(BaseModel):
 class LinkRequest(BaseModel):
     node_id: str
     generation: int
+    scan_id: str
 
 
 class CommandRequest(BaseModel):

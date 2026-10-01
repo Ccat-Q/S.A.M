@@ -9,8 +9,8 @@ OpenAPI 在每次成功 CI 中生成并附于 `ubuntu-server` 产物。请求结
 | POST /api/auth/login | username/password，返回 token、expires_at、user |
 | GET /api/auth/me；POST /api/auth/logout | 当前成员、撤销会话与 Link |
 | GET /api/snapshot | nodes、edges、camera_targets、alerts、generation、tick、paused、cursor |
-| GET /api/nodes/{id}；POST /api/nodes/{id}/scan | 身份、能力、节点状态和 generation |
-| POST /api/links；DELETE /api/links/{id} | node_id/generation，创建或撤销成员控制会话 |
+| GET /api/nodes/{id}；POST /api/nodes/{id}/scan | 查询身份/能力；扫描另返回绑定当前成员会话的 scan_id，5 分钟有效 |
+| POST /api/links；DELETE /api/links/{id} | node_id/generation/scan_id，创建或撤销成员控制会话 |
 | POST /api/commands/prepare | 返回 confirmation_id、expires_at、affected_nodes |
 | POST /api/commands | node_id、link_id、action、value、expected_version、key、可选 confirmation_id |
 | GET /api/commands/by-key/{key} | 查询本成员命令结果，供超时恢复 |

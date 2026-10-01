@@ -11,7 +11,7 @@ from conftest import login
 
 def request_for(client, headers, ident="DEV-02", action="door", value="open"):
     scan = client.post(f"/api/nodes/{ident}/scan", headers=headers).json()
-    link = client.post("/api/links", headers=headers, json={"node_id": ident, "generation": scan["generation"]})
+    link = client.post("/api/links", headers=headers, json={"node_id": ident, "generation": scan["generation"], "scan_id": scan["scan_id"]})
     assert link.status_code == 200, link.text
     return {"node_id": ident, "link_id": link.json()["id"], "action": action, "value": value,
             "expected_version": scan["node"]["version"], "key": str(uuid4())}
@@ -29,7 +29,8 @@ def test_seed_and_permissions(client, admin):
     assert len({n["id"] for n in snap["nodes"]}) == 42
     observer = login(client, "observer")
     assert client.post("/api/nodes/DEV-02/scan", headers=observer).status_code == 200
-    assert client.post("/api/links", headers=observer, json={"node_id": "DEV-02", "generation": 1}).status_code == 403
+    assert client.post("/api/links", headers=observer, json={"node_id": "DEV-02", "generation": 1, "scan_id": "invalid"}).status_code == 403
+    assert client.post("/api/links", headers=admin, json={"node_id": "DEV-02", "generation": 1, "scan_id": "invalid"}).status_code == 409
     assert client.get("/api/snapshot").status_code == 401
 
 

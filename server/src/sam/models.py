@@ -41,10 +41,21 @@ class Link(Base):
     __tablename__ = "links"
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     user_id: Mapped[str] = mapped_column(String(36), index=True)
+    session_hash: Mapped[str] = mapped_column(String(64), index=True)
     node_id: Mapped[str] = mapped_column(String(36))
     generation: Mapped[int] = mapped_column(Integer)
     last_used: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class Scan(Base):
+    __tablename__ = "scans"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(36))
+    session_hash: Mapped[str] = mapped_column(String(64))
+    node_id: Mapped[str] = mapped_column(String(36))
+    generation: Mapped[int] = mapped_column(Integer)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class Confirmation(Base):

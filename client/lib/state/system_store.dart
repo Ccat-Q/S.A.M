@@ -19,7 +19,7 @@ class SystemStore extends ChangeNotifier {
   Map<String, dynamic> cameraTargets = {};
   int cursor = 0, generation = 1, tick = 0;
   bool connected = false, busy = false, initialized = false, paused = false;
-  String? error, selectedId, cameraId, scannedId, linkId;
+  String? error, selectedId, cameraId, scannedId, scanReceipt, linkId;
   String stage = 'OBSERVE';
   String language = 'zh';
   bool crt = true, noise = false, chromatic = false, glitch = false;
@@ -173,7 +173,7 @@ class SystemStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  void clearLink() { linkId = null; scannedId = null; stage = 'OBSERVE'; }
+  void clearLink() { linkId = null; scannedId = null; scanReceipt = null; stage = 'OBSERVE'; }
   void ensureConnected() { if (!connected) throw ApiError(409, 'CONNECTION_LOST'); }
 
   Future<void> scan() async {
@@ -185,7 +185,7 @@ class SystemStore extends ChangeNotifier {
       final result = await api.call('POST', '/api/nodes/$id/scan') as Map;
       if (selectedId != id || !connected) return;
       nodes[id] = Node(Map<String, dynamic>.from(result['node'] as Map));
-      scannedId = id; stage = 'IDENTIFIED';
+      scannedId = id; scanReceipt = result['scan_id'] as String; stage = 'IDENTIFIED';
     } catch (_) { stage = 'OBSERVE'; rethrow; }
     finally { notifyListeners(); }
   }
@@ -196,7 +196,7 @@ class SystemStore extends ChangeNotifier {
     if (scannedId != id || !canControl) throw ApiError(403, 'SCAN_REQUIRED');
     stage = 'AUTHENTICATING'; notifyListeners();
     try {
-      final result = await api.call('POST', '/api/links', body: {'node_id': id, 'generation': generation}) as Map;
+      final result = await api.call('POST', '/api/links', body: {'node_id': id, 'generation': generation, 'scan_id': scanReceipt}) as Map;
       if (selectedId != id || !connected) { await api.call('DELETE', '/api/links/${result['id']}'); return; }
       linkId = result['id'] as String; stage = 'ESTABLISHED';
     } catch (_) { stage = 'IDENTIFIED'; rethrow; }

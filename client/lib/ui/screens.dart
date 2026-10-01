@@ -78,7 +78,7 @@ class _MapScreenState extends State<MapScreen> {
         DropdownButton<String>(value: filter, items: ['ALL', 'CAMERA', 'DEVICE', 'SENSOR', 'SERVER', 'ROBOT', 'NETWORK', 'MODULE'].map((x) => DropdownMenuItem(value: x, child: Text(x, style: const TextStyle(fontSize: 11)))).toList(), onChanged: (v) => setState(() => filter = v!)),
         SizedBox(width: 210, child: TextField(key: const Key('node-search'), decoration: InputDecoration(labelText: store.tr('SEARCH NODE', '搜索节点'), isDense: true),
           onChanged: (v) => setState(() => search = v), onSubmitted: (_) { if (matches.isNotEmpty) widget.inspect(matches.first.id); })),
-        OutlinedButton(onPressed: () { focused = null; transform.value = Matrix4.identity()..scale(.5); }, child: Text(store.tr('FIT', '复位'))),
+        OutlinedButton(onPressed: () { focused = null; transform.value = Matrix4.diagonal3Values(.5, .5, 1); }, child: Text(store.tr('FIT', '复位'))),
       ])),
       if (search.isNotEmpty) SizedBox(height: 44, child: ListView(scrollDirection: Axis.horizontal, children: [for (final n in matches) TextButton(onPressed: () => widget.inspect(n.id), child: Text(n.id))])),
       Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), child: Row(children: [
@@ -92,7 +92,7 @@ class _MapScreenState extends State<MapScreen> {
           final scale = pos == null ? (constraints.maxWidth / mapSize.width).clamp(.25, .75) : .8;
           final center = pos ?? const Offset(600, 400);
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) transform.value = Matrix4.identity()..translate(constraints.maxWidth / 2 - center.dx * scale, constraints.maxHeight / 2 - center.dy * scale)..scale(scale);
+            if (mounted) transform.value = Matrix4.diagonal3Values(scale, scale, 1)..setTranslationRaw(constraints.maxWidth / 2 - center.dx * scale, constraints.maxHeight / 2 - center.dy * scale, 0);
           });
         }
         return MapDisplay(store: store, network: network, controller: transform,
@@ -231,7 +231,7 @@ class _LogsScreenState extends State<LogsScreen> {
         if (since.isNotEmpty) 'since': since, if (until.isNotEmpty) 'until': until,
         if (more && result?.isNotEmpty == true) 'before': '${result!.last['cursor']}',
       }) as List;
-      if (mounted) setState(() => result = [...if (more && result != null) result!, ...data.map((x) => Map<String, dynamic>.from(x as Map))]);
+      if (mounted) setState(() => result = [if (more && result != null) ...result!, ...data.map((x) => Map<String, dynamic>.from(x as Map))]);
     });
     if (mounted) setState(() => loading = false);
   }
@@ -244,7 +244,7 @@ class _LogsScreenState extends State<LogsScreen> {
       Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
         SizedBox(width: 200, child: TextFormField(decoration: InputDecoration(labelText: store.tr('SEARCH', '搜索')), onChanged: (v) => query = v)),
         SizedBox(width: 160, child: TextFormField(initialValue: node, decoration: const InputDecoration(labelText: 'NODE ID'), onChanged: (v) => node = v)),
-        DropdownButton<String>(value: category, items: ['', 'SYSTEM', 'NETWORK', 'COMMAND', 'ALERT', 'SECURITY', 'USER', 'TELEMETRY'].map((x) => DropdownMenuItem(value: x, child: Text(x.isEmpty ? 'ALL' : x))).toList(), onChanged: (v) => setState(() => category = v!)),
+        DropdownButton<String>(value: category, items: ['', 'SYSTEM', 'NETWORK', 'DEVICE', 'CAMERA', 'COMMAND', 'ALERT', 'SECURITY', 'USER', 'TELEMETRY'].map((x) => DropdownMenuItem(value: x, child: Text(x.isEmpty ? 'ALL' : x))).toList(), onChanged: (v) => setState(() => category = v!)),
         SizedBox(width: 220, child: TextFormField(decoration: const InputDecoration(labelText: 'FROM / ISO-8601 + TIMEZONE'), onChanged: (v) => since = v)),
         SizedBox(width: 220, child: TextFormField(decoration: const InputDecoration(labelText: 'TO / ISO-8601 + TIMEZONE'), onChanged: (v) => until = v)),
         OutlinedButton(onPressed: loading ? null : search, child: Text(store.tr('QUERY', '查询'))),

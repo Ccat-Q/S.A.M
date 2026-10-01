@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from fastapi import HTTPException
 from sqlalchemy import select
+from sqlalchemy.orm.attributes import flag_modified
 
 from .auth import aware
 from .config import settings
@@ -61,6 +62,8 @@ def recompute(scene):
 
 
 def changes(db, scene, before, category, message, ident=None, actor=None, correlation=None):
+    # Nested JSON changes need explicit dirty marking before event flushes.
+    flag_modified(scene, "data")
     old = {n["id"]: n for n in before["nodes"]}
     changed = [n for n in scene.data["nodes"] if n != old.get(n["id"])]
     emit(db, category, message, ident, actor, correlation,

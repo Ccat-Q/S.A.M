@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import math
+import time
 from copy import deepcopy
 
 from .config import settings
@@ -37,9 +38,16 @@ def tick():
 
 
 async def run():
+    last_purge = time.monotonic()
     while True:
         await asyncio.sleep(settings.tick_seconds)
         try:
             await asyncio.to_thread(tick)
+            if time.monotonic() - last_purge >= 3600:
+                def maintenance():
+                    with transaction() as db:
+                        purge(db)
+                await asyncio.to_thread(maintenance)
+                last_purge = time.monotonic()
         except Exception:
             logger.exception("Simulation tick failed; retrying on next tick")

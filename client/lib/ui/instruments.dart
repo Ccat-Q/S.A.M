@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'theme.dart';
+import 'errors.dart';
 
 class Panel extends StatelessWidget {
   final String title;
@@ -45,6 +46,6 @@ class StatusLamp extends StatelessWidget {
 Future<void> report(BuildContext context, Future<void> Function() action) async {
   try { await action(); }
   catch (error) {
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString()), backgroundColor: const Color(0xff442726)));
+    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(explainError(error, Localizations.localeOf(context).languageCode == 'zh')), backgroundColor: const Color(0xff442726)));
   }
 }

@@ -5,6 +5,7 @@ import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from copy import deepcopy
+from datetime import timedelta
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
@@ -12,11 +13,11 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
 
 from . import simulator
-from .auth import (authenticate, current_user, issue_session, member_dict, passwords,
+from .auth import (authenticate, aware, current_user, issue_session, member_dict, passwords,
                    require_admin, require_operator, token_hash, user_for_token)
 from .config import settings
 from .control import changes, execute, node, prepare, recompute
-from .models import Command, Confirmation, Event, Link, Scene, Session, User, now
+from .models import Command, Confirmation, Event, Link, Scan, Scene, Session, User, now
 from .schemas import (CommandRequest, FaultRequest, LinkRequest, LoginRequest,
                       MemberCreate, MemberUpdate, SimulationRequest)
 from .seed import initial_scene
@@ -60,6 +61,17 @@ def health():
     return {"status": "ONLINE", "simulated": True}
 
 
+def authorized_scene(db, user, admin=False):
+    scene = locked_scene(db)
+    current = db.get(User, user.id)
+    if not current or not current.enabled:
+        raise HTTPException(401, "SESSION_EXPIRED")
+    allowed = ("admin",) if admin else ("admin", "operator")
+    if current.role not in allowed:
+        raise HTTPException(403, "ADMIN_REQUIRED" if admin else "CONTROL_FORBIDDEN")
+    return scene
+
+
 @app.post("/api/auth/login")
 def login(body: LoginRequest, request: Request):
     # Do not trust X-Forwarded-For; cloudflared is the sole published entrance.
@@ -101,25 +113,43 @@ def get_snapshot(user=Depends(current_user)):
 
 
 @app.get("/api/nodes/{ident}")
-@app.post("/api/nodes/{ident}/scan")
-def scan(ident: str, user=Depends(current_user)):
+def inspect_node(ident: str, user=Depends(current_user)):
     with SessionFactory() as db:
         scene = db.get(Scene, 1)
         return {"state": "IDENTIFIED", "node": node(scene, ident), "generation": scene.generation,
                 "can_control": user.role in ("admin", "operator")}
 
 
-@app.post("/api/links")
-def create_link(body: LinkRequest, user=Depends(require_operator)):
+@app.post("/api/nodes/{ident}/scan")
+def scan(ident: str, request: Request, user=Depends(current_user)):
     with transaction() as db:
         scene = locked_scene(db)
+        n = node(scene, ident)
+        receipt = Scan(id=str(uuid4()), user_id=user.id, node_id=ident,
+                       session_hash=token_hash(request.headers["authorization"].split(" ", 1)[1]),
+                       generation=scene.generation,
+                       expires_at=now() + timedelta(seconds=settings.link_idle_seconds))
+        db.add(receipt)
+        emit(db, "CAMERA" if n["type"] == "CAMERA" else "DEVICE", "NODE IDENTIFIED", ident, user.username)
+        return {"state": "IDENTIFIED", "scan_id": receipt.id, "node": n,
+                "generation": scene.generation, "can_control": user.role in ("admin", "operator")}
+
+
+@app.post("/api/links")
+def create_link(body: LinkRequest, request: Request, user=Depends(require_operator)):
+    with transaction() as db:
+        scene = authorized_scene(db, user)
         n = node(scene, body.node_id)
         if scene.generation != body.generation:
             raise HTTPException(409, "SCENE_CHANGED")
         parents = [e["source"] for e in scene.data["edges"] if e["target"] == n["id"]]
         if any(node(scene, p)["status"] == "OFFLINE" for p in parents):
             raise HTTPException(409, "UPSTREAM_UNAVAILABLE")
-        link = Link(id=str(uuid4()), user_id=user.id, node_id=n["id"], generation=scene.generation,
+        session_hash = token_hash(request.headers["authorization"].split(" ", 1)[1])
+        receipt = db.get(Scan, body.scan_id)
+        if not receipt or receipt.user_id != user.id or receipt.session_hash != session_hash or receipt.node_id != n["id"] or receipt.generation != scene.generation or aware(receipt.expires_at) <= now():
+            raise HTTPException(409, "SCAN_REQUIRED")
+        link = Link(id=str(uuid4()), user_id=user.id, session_hash=session_hash, node_id=n["id"], generation=scene.generation,
                     last_used=now(), revoked=False)
         db.add(link)
         emit(db, "USER", "CONTROL LINK ESTABLISHED", n["id"], user.username)
@@ -139,13 +169,13 @@ def revoke_link(ident: str, user=Depends(current_user)):
 @app.post("/api/commands/prepare")
 def prepare_command(body: CommandRequest, user=Depends(require_operator)):
     with transaction() as db:
-        return prepare(db, locked_scene(db), user, body)
+        return prepare(db, authorized_scene(db, user), user, body)
 
 
 @app.post("/api/commands")
 def command(body: CommandRequest, user=Depends(require_operator)):
     with transaction() as db:
-        return execute(db, locked_scene(db), user, body)
+        return execute(db, authorized_scene(db, user), user, body)
 
 
 @app.get("/api/commands/by-key/{key}")
@@ -160,7 +190,7 @@ def command_result(key: str, user=Depends(current_user)):
 @app.post("/api/alerts/{ident}/acknowledge")
 def acknowledge(ident: str, user=Depends(require_operator)):
     with transaction() as db:
-        scene = locked_scene(db)
+        scene = authorized_scene(db, user)
         before = deepcopy(scene.data)
         a = next((a for a in scene.data["alerts"] if a["id"] == ident), None)
         if a is None:
@@ -211,7 +241,7 @@ def members(user=Depends(require_admin)):
 def create_member(body: MemberCreate, user=Depends(require_admin)):
     try:
         with transaction() as db:
-            locked_scene(db)
+            authorized_scene(db, user, admin=True)
             member = User(id=str(uuid4()), username=body.username, password_hash=passwords.hash(body.password),
                           role=body.role, enabled=True)
             db.add(member)
@@ -224,7 +254,7 @@ def create_member(body: MemberCreate, user=Depends(require_admin)):
 @app.patch("/api/members/{ident}")
 def update_member(ident: str, body: MemberUpdate, user=Depends(require_admin)):
     with transaction() as db:
-        locked_scene(db)
+        authorized_scene(db, user, admin=True)
         member = db.get(User, ident)
         if not member:
             raise HTTPException(404, "MEMBER_NOT_FOUND")
@@ -243,7 +273,7 @@ def update_member(ident: str, body: MemberUpdate, user=Depends(require_admin)):
 @app.post("/api/simulation/fault")
 def fault(body: FaultRequest, user=Depends(require_admin)):
     with transaction() as db:
-        scene = locked_scene(db)
+        scene = authorized_scene(db, user, admin=True)
         before = deepcopy(scene.data)
         n = node(scene, body.node_id)
         n["fault"] = body.fault
@@ -256,7 +286,7 @@ def fault(body: FaultRequest, user=Depends(require_admin)):
 @app.post("/api/simulation")
 def simulation(body: SimulationRequest, user=Depends(require_admin)):
     with transaction() as db:
-        scene = locked_scene(db)
+        scene = authorized_scene(db, user, admin=True)
         before = deepcopy(scene.data)
         if body.action == "reset":
             history = deepcopy(scene.data["alerts"])
@@ -269,6 +299,7 @@ def simulation(body: SimulationRequest, user=Depends(require_admin)):
             scene.tick, scene.paused = 0, False
             db.execute(delete(Link))
             db.execute(delete(Confirmation))
+            db.execute(delete(Scan))
         elif body.action == "scenario":
             n = node(scene, "DEV-01")
             n["fault"] = "OUTPUT_FAILURE"
@@ -332,7 +363,7 @@ async def stream(ws: WebSocket, after: int = 0):
             with transaction() as db:
                 session = db.get(Session, token_hash(token))
                 if session:
-                    for link in db.scalars(select(Link).where(Link.user_id == session.user_id)):
+                    for link in db.scalars(select(Link).where(Link.session_hash == session.token_hash)):
                         link.revoked = True
         except Exception:
             logger.exception("Failed to revoke links after stream disconnect")
