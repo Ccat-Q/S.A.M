@@ -14,7 +14,7 @@ Future<void> waitFor(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   testWidgets('live service: alert → locate → camera → scan → link → recover → audit', (tester) async {
     final store = SystemStore(api: SamApi('http://localhost:8000'), persist: false);
     await tester.pumpWidget(SamApp(store: store));
@@ -25,18 +25,22 @@ void main() {
     await waitFor(tester, find.byKey(const Key('nav-3')));
     for (var i = 0; i < 100 && !store.connected; i++) { await tester.pump(const Duration(milliseconds: 100)); }
     expect(store.connected, isTrue);
+    await binding.takeScreenshot('01-overview');
     await store.simulate('scenario');
     await tester.tap(find.byKey(const Key('nav-3')));
     await waitFor(tester, find.byKey(const ValueKey('locate-DEV-01')));
+    await binding.takeScreenshot('02-alerts');
     await tester.ensureVisible(find.byKey(const ValueKey('locate-DEV-01')));
     await tester.tap(find.byKey(const ValueKey('locate-DEV-01')));
     await waitFor(tester, find.text('DEV-01 // POWER'));
     expect(store.selectedId, 'DEV-01');
+    await binding.takeScreenshot('03-facility-map');
     // Select the other camera in this module; the power outage affects both.
     // Camera still provides explicit no-signal telemetry, without fake vision.
     await tester.tap(find.byKey(const Key('nav-2')));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.textContaining('NO SIGNAL'), findsWidgets);
+    await binding.takeScreenshot('04-camera-offline');
     await tester.tap(find.byKey(const Key('nav-1')));
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('检查'));
@@ -47,9 +51,11 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('link-device')));
     await tester.tap(find.byKey(const Key('link-device')));
     await waitFor(tester, find.byKey(const Key('recover-device')));
+    await binding.takeScreenshot('05-control-inspector');
     await tester.ensureVisible(find.byKey(const Key('recover-device')));
     await tester.tap(find.byKey(const Key('recover-device')));
     await waitFor(tester, find.byKey(const Key('confirm-command')));
+    await binding.takeScreenshot('06-impact-confirmation');
     await tester.tap(find.byKey(const Key('confirm-command')));
     for (var i = 0; i < 100 && store.nodes['DEV-01']!.fault != null; i++) { await tester.pump(const Duration(milliseconds: 100)); }
     expect(store.nodes['DEV-01']!.fault, isNull);

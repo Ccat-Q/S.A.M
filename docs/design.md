@@ -13,7 +13,7 @@
 
 背景 #050708 / #0B0E0F，文字 #D8E2DF，主色 #8FC9BC；琥珀 WARNING、低饱和红 CRITICAL、灰 OFFLINE、蓝灰通信线路。供电线路用琥珀区分。主色是项目品牌选择，不是原作取色结果。
 
-1px 边框、方形模块、技术标签、等宽读数、细刻度、小型状态灯。使用系统字体及中文 fallback，不复用原作字体。不采用 SaaS 卡片、霓虹大渐变、Emoji 或巨型控制按钮。
+1px 边框、方形模块、技术标签、等宽读数、细刻度、小型状态灯。读数使用 Roboto Mono，标题使用 Roboto Condensed，并保留系统中文 fallback；字体来自 [Google Fonts 官方仓库](https://github.com/google/fonts)，SIL OFL 许可证与字体一同存放于 `client/assets/fonts/`。不复用原作字体。不采用 SaaS 卡片、霓虹大渐变、Emoji 或巨型控制按钮。
 
 字体/状态/反馈统一；设备控制面板按能力变化：电源采用隔离/恢复、门禁开闭、灯光刻度、云台轴值、传感器诊断。可见按钮必须反映权限和连接状态。
 

@@ -18,4 +18,4 @@ DESTINATION="$PWD/artifacts/sam-unsigned.ipa"
 (cd "$PACKAGE_DIR" && zip -qry "$DESTINATION" Payload)
 unzip -t "$DESTINATION"
 unzip -l "$DESTINATION" > artifacts/IPA-CONTENTS.txt
-shasum -a 256 "$DESTINATION" > artifacts/IPA-SHA256.txt
+(cd artifacts && shasum -a 256 sam-unsigned.ipa > IPA-SHA256.txt)

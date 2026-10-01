@@ -49,7 +49,7 @@ jobs:
           cp -r deploy artifacts/deploy
           cp docs/deployment.md artifacts/deploy/README.md
           printf '%s\n' "$GITHUB_SHA" > artifacts/COMMIT
-          sha256sum artifacts/sam-server.tar.gz > artifacts/SHA256SUMS
+          (cd artifacts && sha256sum sam-server.tar.gz > SHA256SUMS)
       - uses: actions/upload-artifact@v4
         with:
           name: ubuntu-server
@@ -71,7 +71,13 @@ jobs:
         with:
           python-version: '3.12'
       - name: Prepare native projects
-        run: python3 scripts/native_projects.py
+        run: |
+          mkdir -p artifacts
+          python3 scripts/native_projects.py
+          swift scripts/icon.swift
+      - name: Format source for review
+        working-directory: client
+        run: dart format lib test integration_test test_driver
       - name: Resolve, analyze, and test
         working-directory: client
         run: |
@@ -93,15 +99,16 @@ jobs:
           cd server
           alembic upgrade head
           python ../scripts/ci_members.py
-          uvicorn sam.api:app --host 127.0.0.1 --port 8000 --no-access-log > /tmp/sam-api.log 2>&1 &
+          uvicorn sam.api:app --host 127.0.0.1 --port 8000 --no-access-log > ../artifacts/integration-api.log 2>&1 &
           for attempt in {1..30}; do curl -fsS http://127.0.0.1:8000/health && break; sleep 1; done
       - name: Boot simulator and verify operator journey
+        timeout-minutes: 20
         working-directory: client
         run: |
           DEVICE_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for v in d["devices"].values() for x in v if x["name"].startswith("iPhone")))')
           xcrun simctl boot "$DEVICE_ID" || true
-          xcrun simctl bootstatus "$DEVICE_ID" -b
-          flutter test integration_test/journey_test.dart -d "$DEVICE_ID" --dart-define=SAM_CI=true
+          python3 -c 'import subprocess,sys; subprocess.run(["xcrun", "simctl", "bootstatus", sys.argv[1], "-b"], check=True, timeout=240)' "$DEVICE_ID"
+          flutter drive --driver=test_driver/journey_driver.dart --target=integration_test/journey_test.dart -d "$DEVICE_ID" --dart-define=SAM_CI=true 2>&1 | tee ../artifacts/ios-journey.log
       - name: Build unsigned device application
         working-directory: client
         run: flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
@@ -114,6 +121,15 @@ jobs:
           path: |
             artifacts/sam-unsigned.ipa
             artifacts/IPA-CONTENTS.txt
+            artifacts/IPA-SHA256.txt
+            artifacts/screenshots/
+            artifacts/integration-api.log
+            artifacts/ios-journey.log
+            client/lib/
+            client/test/
+            client/test_driver/
+            client/integration_test/
+            client/assets/
             client/ios/
             client/android/
             client/pubspec.lock

@@ -56,7 +56,7 @@ class MapPainter extends CustomPainter {
   final Set<String>? visible;
   MapPainter({required this.store, required this.positions, required this.network, this.visible});
   void label(Canvas canvas, String text, Offset p, Color color, {double size = 10}) {
-    final painter = TextPainter(text: TextSpan(text: text, style: TextStyle(color: color, fontSize: size, fontFamily: 'monospace')), textDirection: TextDirection.ltr)..layout();
+    final painter = TextPainter(text: TextSpan(text: text, style: TextStyle(color: color, fontSize: size, fontFamily: 'RobotoMono')), textDirection: TextDirection.ltr)..layout();
     painter.paint(canvas, p);
   }
   @override

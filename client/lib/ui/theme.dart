@@ -19,9 +19,9 @@ Color statusColor(String status) => switch (status) {
 ThemeData samTheme() => ThemeData(
   brightness: Brightness.dark, scaffoldBackgroundColor: background,
   colorScheme: const ColorScheme.dark(primary: accent, surface: surface, error: critical),
-  fontFamily: 'monospace',
+  fontFamily: 'RobotoMono',
   textTheme: const TextTheme(bodyMedium: TextStyle(color: ink, fontSize: 13, height: 1.5),
-      titleLarge: TextStyle(color: ink, fontSize: 23, letterSpacing: 2, fontWeight: FontWeight.w600)),
+      titleLarge: TextStyle(fontFamily: 'RobotoCondensed', color: ink, fontSize: 23, letterSpacing: 2, fontWeight: FontWeight.w600)),
   dividerColor: line,
   inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: surface,
     border: const OutlineInputBorder(borderRadius: BorderRadius.zero),
@@ -30,6 +30,6 @@ ThemeData samTheme() => ThemeData(
   outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(
     foregroundColor: accent, side: const BorderSide(color: line),
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-    minimumSize: const Size(44, 44), textStyle: const TextStyle(fontFamily: 'monospace', fontSize: 12))),
+    minimumSize: const Size(44, 44), textStyle: const TextStyle(fontFamily: 'RobotoMono', fontSize: 12))),
   dialogTheme: const DialogThemeData(backgroundColor: surface, shape: RoundedRectangleBorder()),
 );

@@ -12,7 +12,7 @@ cp .env.example .env
 chmod 600 .env
 ```
 
-校验文件记录的相对路径需要对应解压目录；若归档层级不同，使用 `sha256sum sam-server.tar.gz` 对照文件中的摘要。设置 `.env`：POSTGRES_PASSWORD 使用 URL-safe 随机值（例如 `openssl rand -hex 32`）；TUNNEL_TOKEN 使用你创建的 tunnel token；SAM_IMAGE 使用 `sam-server:<COMMIT>`，避免运行未知 latest。
+校验文件使用产物文件名，在包含镜像的解压目录执行。设置 `.env`：POSTGRES_PASSWORD 使用 URL-safe 随机值（例如 `openssl rand -hex 32`）；TUNNEL_TOKEN 使用你创建的 tunnel token；SAM_IMAGE 使用 `sam-server:<COMMIT>`，避免运行未知 latest。
 
 ## 入口与首次启动
 
