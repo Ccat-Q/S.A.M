@@ -4,6 +4,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:sam_client/main.dart';
 import 'package:sam_client/data/api.dart';
 import 'package:sam_client/state/system_store.dart';
+import 'package:sam_client/ui/inspector.dart';
 
 Future<void> waitFor(WidgetTester tester, Finder finder) async {
   for (var i = 0; i < 120; i++) {
@@ -63,6 +64,16 @@ void main() {
     expect(records.any((x) => x['category'] == 'COMMAND' && x['actor'] == 'admin'), isTrue);
     final snapshot = await store.api.call('GET', '/api/snapshot') as Map;
     expect((snapshot['alerts'] as List).any((a) => a['node_id'] == 'DEV-01' && a['state'] == 'RESOLVED'), isTrue);
+    Navigator.of(tester.element(find.byType(Inspector))).pop();
+    store.setCamera('CAM-01');
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byKey(const Key('nav-2')));
+    await waitFor(tester, find.byKey(const ValueKey('target-DEV-02')));
+    await binding.takeScreenshot('07-camera-online');
+    await tester.tap(find.byKey(const ValueKey('target-DEV-02')));
+    await waitFor(tester, find.byKey(const Key('scan-device')));
+    expect(store.selectedId, 'DEV-02');
+    expect(store.linked, isFalse);
     await store.suspend();
     expect(store.linked, isFalse);
     await store.setLanguage('en'); await store.effects('crt', false);

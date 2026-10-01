@@ -9,12 +9,13 @@ for item in json["images"] as! [[String: Any]] {
     let points = Double(size.split(separator: "x")[0])!
     let scale = Double((item["scale"] as? String ?? "1x").replacingOccurrences(of: "x", with: ""))!
     let pixels = Int(points * scale)
-    let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels,
-        bitsPerSample: 8, samplesPerPixel: 3, hasAlpha: false, isPlanar: false,
-        colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    guard let context = CGContext(data: nil, width: pixels, height: pixels,
+        bitsPerComponent: 8, bytesPerRow: pixels * 4, space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else {
+        fatalError("Unable to create opaque app icon bitmap: \(pixels)")
+    }
     NSGraphicsContext.saveGraphicsState()
-    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
-    let context = NSGraphicsContext.current!.cgContext
+    NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
     context.scaleBy(x: CGFloat(pixels) / 1024, y: CGFloat(pixels) / 1024)
     context.setFillColor(CGColor(red: 5/255, green: 7/255, blue: 8/255, alpha: 1))
     context.fill(CGRect(x: 0, y: 0, width: 1024, height: 1024))
@@ -39,5 +40,6 @@ for item in json["images"] as! [[String: Any]] {
                          .foregroundColor: NSColor(red: 216/255, green: 226/255, blue: 223/255, alpha: 1),
                          .paragraphStyle: style])
     NSGraphicsContext.restoreGraphicsState()
+    let bitmap = NSBitmapImageRep(cgImage: context.makeImage()!)
     try bitmap.representation(using: .png, properties: [:])!.write(to: folder.appendingPathComponent(filename))
 }

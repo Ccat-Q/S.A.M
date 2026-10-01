@@ -95,10 +95,14 @@ def test_websocket_replay_and_disconnect_revokes_link(client, admin):
     cursor = client.get("/api/snapshot", headers=admin).json()["cursor"]
     with client.websocket_connect(f"/api/stream?after={cursor}", headers=admin) as ws:
         req = request_for(client, admin)
-        packet = ws.receive_json()
-        while not packet.get("events"):
-            packet = ws.receive_json()
-        assert any(e["message"] == "CONTROL LINK ESTABLISHED" for e in packet["events"])
+        # SCAN and LINK are separate commits and may arrive in separate frames.
+        events = []
+        for _ in range(10):
+            events.extend(ws.receive_json().get("events", []))
+            if any(e["message"] == "CONTROL LINK ESTABLISHED" for e in events):
+                break
+        assert any(e["message"] == "CONTROL LINK ESTABLISHED" for e in events)
+        assert [e["cursor"] for e in events] == sorted(e["cursor"] for e in events)
         ws.send_text("close")
     assert client.post("/api/commands", headers=admin, json=req).json()["detail"] == "LINK_REQUIRED"
 
