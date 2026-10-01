@@ -32,9 +32,8 @@ void main() {
         persist: false,
       );
       addTearDown(() async {
-        await store.suspend();
+        // SamApp owns and disposes the injected store when removed.
         await tester.pumpWidget(const SizedBox.shrink());
-        store.dispose();
       });
       await tester.pumpWidget(SamApp(store: store));
       await waitFor(tester, find.byKey(const Key('login')));

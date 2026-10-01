@@ -351,7 +351,7 @@ void main() {
     expect(find.text('NO ACTIVE EXCEPTIONS'), findsOneWidget);
     await tester.tap(find.byKey(const Key('soft-HISTORY')));
     await tester.pump();
-    final scroll = find.descendant(of: find.byType(AnomalyMatrix), matching: find.byType(SingleChildScrollView));
+    final scroll = find.descendant(of: find.byType(AnomalyMatrix), matching: find.byType(Scrollable));
     await tester.drag(scroll, const Offset(0, -900));
     await tester.pump(const Duration(seconds: 1));
     final rect = tester.getRect(find.byKey(const Key('anomaly-matrix')));
@@ -429,7 +429,7 @@ void main() {
       for (var i = 0; i < 20 && find.textContaining('CLASS POWER').evaluate().isEmpty; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
-      expect(store.stage, 'IDENTIFIED');
+      expect(store.stage, 'IDENTIFIED', reason: SystemMessages.shared.message);
       expect(find.textContaining('CLASS POWER'), findsOneWidget);
       expect(store.linked, isFalse);
       expect(terminals, 0);

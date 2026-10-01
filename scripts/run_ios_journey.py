@@ -47,6 +47,22 @@ try:
         "--driver=test_driver/journey_driver.dart", "--target=integration_test/journey_test.dart",
         f"--use-existing-app={uri}", "-d", device,
     ], cwd=client)
+    if result.returncode == 0:
+        # The extended driver can omit a test_api tearDown failure. Require
+        # the application's own completion as well as the driver exit status.
+        native_deadline = time.monotonic() + 15
+        while True:
+            native = simctl("spawn", device, "log", "show", "--last", "3m", "--style", "compact",
+                            "--predicate", 'process == "Runner"', timeout=10,
+                            capture_output=True, text=True, check=True)
+            (root / "artifacts/simulator-test.log").write_text(native.stdout + native.stderr)
+            if "Some tests failed." in native.stdout:
+                raise RuntimeError("Native Flutter test framework reported a failure; see simulator-test.log")
+            if "All tests passed" in native.stdout:
+                break
+            if time.monotonic() >= native_deadline:
+                raise RuntimeError("Native Flutter test framework did not report successful completion")
+            time.sleep(1)
     sys.exit(result.returncode)
 finally:
     try:

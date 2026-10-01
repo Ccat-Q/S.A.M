@@ -180,6 +180,7 @@ jobs:
             artifacts/ios-journey.log
             artifacts/ios-simulator-build.log
             artifacts/simulator-startup.log
+            artifacts/simulator-test.log
             artifacts/simulator-boot.log
             artifacts/simulator.log
             client/build/integration_test/
