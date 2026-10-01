@@ -23,8 +23,14 @@ def simctl(*args, timeout=20, **kwargs):
 
 try:
     simctl("install", device, str(client / "build/ios/iphonesimulator/Runner.app"), timeout=45, check=True)
-    simctl("launch", device, bundle, "--start-paused", "--enable-checked-mode",
-           "--verify-entry-points", "--disable-vm-service-publication", timeout=60, check=True)
+    try:
+        simctl("launch", device, bundle, "--start-paused", "--enable-checked-mode",
+               "--verify-entry-points", "--disable-vm-service-publication", timeout=60, check=True)
+    except subprocess.TimeoutExpired:
+        # simctl can stall returning the PID after launching the application.
+        # A timeout alone is not readiness: the authenticated VM address and
+        # both native/driver test completions below must still be verified.
+        print("Simulator launch response timed out; checking persisted VM readiness.", flush=True)
     deadline = time.monotonic() + 45
     uri = None
     while time.monotonic() < deadline:

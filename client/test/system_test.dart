@@ -355,7 +355,10 @@ void main() {
     await tester.pump();
     final scroll = find.descendant(of: find.byType(AnomalyMatrix), matching: find.byType(Scrollable));
     await tester.drag(scroll, const Offset(0, -900));
+    await tester.pump();
     await tester.pump(const Duration(seconds: 1));
+    final position = tester.state<ScrollableState>(scroll).position;
+    expect(position.pixels, closeTo(position.maxScrollExtent, 1));
     final rect = tester.getRect(find.byKey(const Key('anomaly-matrix')));
     await tester.tapAt(rect.topLeft + const Offset(75, 750));
     await tester.pump();
