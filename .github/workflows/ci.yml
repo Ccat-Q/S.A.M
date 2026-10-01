@@ -126,6 +126,12 @@ jobs:
       SAM_SIMULATION_ENABLED: 'false'
     steps:
       - uses: actions/checkout@v4
+      - name: Start simulator while preparing dependencies
+        run: |
+          mkdir -p artifacts
+          DEVICE_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for v in d["devices"].values() for x in v if x["name"].startswith("iPhone")))')
+          printf 'SAM_SIMULATOR_ID=%s\n' "$DEVICE_ID" >> "$GITHUB_ENV"
+          python3 scripts/run_with_deadline.py --seconds 120 xcrun simctl boot "$DEVICE_ID" > artifacts/simulator-boot.log 2>&1 &
       - uses: ./.github/actions/prepare-client
         id: client
       - uses: actions/setup-python@v5
@@ -151,8 +157,7 @@ jobs:
         timeout-minutes: 10
         working-directory: client
         run: |
-          DEVICE_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for v in d["devices"].values() for x in v if x["name"].startswith("iPhone")))')
-          xcrun simctl boot "$DEVICE_ID" || true
+          DEVICE_ID="$SAM_SIMULATOR_ID"
           python3 ../scripts/run_with_deadline.py --seconds 120 xcrun simctl bootstatus "$DEVICE_ID" -b
           python3 ../scripts/run_with_deadline.py --seconds 360 flutter build ios --simulator --debug --target=integration_test/journey_test.dart --dart-define=SAM_CI=true 2>&1 | tee ../artifacts/ios-simulator-build.log
           python3 ../scripts/run_with_deadline.py --seconds 180 python3 ../scripts/run_ios_journey.py "$DEVICE_ID" 2>&1 | tee ../artifacts/ios-journey.log
@@ -175,6 +180,7 @@ jobs:
             artifacts/ios-journey.log
             artifacts/ios-simulator-build.log
             artifacts/simulator-startup.log
+            artifacts/simulator-boot.log
             artifacts/simulator.log
             client/build/integration_test/
           if-no-files-found: warn

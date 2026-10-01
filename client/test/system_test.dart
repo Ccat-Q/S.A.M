@@ -200,42 +200,63 @@ void main() {
       store.dispose();
     },
   );
-  testWidgets('pair sequence gates transport; a wrong symbol cannot establish a link', (tester) async {
-    var linkRequests = 0;
-    final api = SamApi('https://example.com', client: MockClient((request) async {
-      expect(request.url.path, '/api/links');
-      linkRequests++;
-      return http.Response('{"id":"verified-link"}', 200);
-    }));
-    final store = SystemStore(api: api, persist: false)
-      ..loadSnapshot(fixture())..selectNode('DEV-01');
-    store.user = {'id': 'test-member', 'role': 'operator'};
-    store.connected = true;
-    store.scannedId = 'DEV-01';
-    store.scanReceipt = 'verified-scan';
-    await tester.pumpWidget(MaterialApp(theme: samTheme(), home: Scaffold(
-      body: SingleChildScrollView(child: Inspector(store: store)))));
-    await tester.tap(find.byKey(const Key('link-device')));
-    await tester.pump();
-    final sequence = tester.widget<Text>(find.byKey(const Key('pair-sequence')))
-      .data!.split(' / ').last.split(' ');
-    final wrong = ['△','○','□'].firstWhere((symbol) => symbol != sequence.first);
-    await tester.tap(find.byKey(ValueKey('pair-$wrong')));
-    await tester.pump();
-    expect(linkRequests, 0);
-    expect(store.linked, isFalse);
-    for (var i = 0; i < sequence.length; i++) {
-      await tester.tap(find.byKey(ValueKey('pair-${sequence[i]}')));
+  testWidgets(
+    'pair sequence gates transport; a wrong symbol cannot establish a link',
+    (tester) async {
+      var linkRequests = 0;
+      final api = SamApi(
+        'https://example.com',
+        client: MockClient((request) async {
+          expect(request.url.path, '/api/links');
+          linkRequests++;
+          return http.Response('{"id":"verified-link"}', 200);
+        }),
+      );
+      final store = SystemStore(api: api, persist: false)
+        ..loadSnapshot(fixture())
+        ..selectNode('DEV-01');
+      store.user = {'id': 'test-member', 'role': 'operator'};
+      store.connected = true;
+      store.scannedId = 'DEV-01';
+      store.scanReceipt = 'verified-scan';
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: samTheme(),
+          home: Scaffold(
+            body: SingleChildScrollView(child: Inspector(store: store)),
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const Key('link-device')));
       await tester.pump();
-      if (i < 2) expect(linkRequests, 0);
-    }
-    await tester.pump();
-    expect(linkRequests, 1);
-    expect(store.linked, isTrue);
-    await tester.pump(const Duration(seconds: 6));
-    await tester.pumpWidget(const SizedBox.shrink());
-    store.dispose();
-  });
+      final sequence = tester
+          .widget<Text>(find.byKey(const Key('pair-sequence')))
+          .data!
+          .split(' / ')
+          .last
+          .split(' ');
+      final wrong = [
+        '△',
+        '○',
+        '□',
+      ].firstWhere((symbol) => symbol != sequence.first);
+      await tester.tap(find.byKey(ValueKey('pair-$wrong')));
+      await tester.pump();
+      expect(linkRequests, 0);
+      expect(store.linked, isFalse);
+      for (var i = 0; i < sequence.length; i++) {
+        await tester.tap(find.byKey(ValueKey('pair-${sequence[i]}')));
+        await tester.pump();
+        if (i < 2) expect(linkRequests, 0);
+      }
+      await tester.pump();
+      expect(linkRequests, 1);
+      expect(store.linked, isTrue);
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpWidget(const SizedBox.shrink());
+      store.dispose();
+    },
+  );
   test('typed transport preserves error codes and request identity', () async {
     final api = SamApi(
       'https://example.com',

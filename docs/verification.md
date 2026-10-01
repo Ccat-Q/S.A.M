@@ -17,6 +17,7 @@
 - Python pip 按平台、Python 版本及 `server/pyproject.toml` 恢复下载缓存，安装与测试仍执行。
 - Flutter SDK 按 OS、CPU、版本和发行包摘要缓存；Pub 按版本与 `pubspec.lock` 缓存。SDK/依赖就绪后立即保存，后续模拟器失败不会丢失这两层缓存；依赖解析使用 `--enforce-lockfile`。
 - CocoaPods 缓存下载与索引；Xcode DerivedData 按构建/验收用途、OS/CPU、Flutter、Xcode、依赖与原生配置隔离，每个提交保存增量版本。缓存恢复后仍执行正常编译及验收，不直接交付缓存应用，不缓存模拟器数据、数据库、账号、Token 或最终 IPA。
+- 模拟器冷启动在 checkout 后立即开始，与 SDK、依赖和服务端准备重叠；执行验收前仍等待 bootstatus 完成。模拟器启动日志作为诊断产物保留。交互验收在元素出现后等待 280ms 扫描重绘结束，避免操作尚未显示的 hitbox。
 - Docker Buildx 使用 GitHub Actions 构建层缓存，依赖安装层与应用代码层分离。镜像采用快速 gzip，已压缩产物上传时关闭二次压缩。
 
 首次运行填充缓存；后续查看各缓存步骤的命中记录、Docker `CACHED` 输出与步骤耗时。更换工具链/依赖自动失效；需要强制清除时提高 `.github/actions/prepare-client/action.yml` 中对应缓存键的版本。缓存不绕过任何构建或测试要求。

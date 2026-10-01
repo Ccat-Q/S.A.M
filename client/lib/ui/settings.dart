@@ -330,7 +330,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: Text(
                       '${member['role']} / ${member['enabled'] == true ? 'ENABLED' : 'DISABLED'}',
                     ),
-                    trailing: const Text('>',style:TextStyle(color:muted,fontSize:10)),
+                    trailing: const Text(
+                      '>',
+                      style: TextStyle(color: muted, fontSize: 10),
+                    ),
                   ),
               ],
             ),

@@ -65,23 +65,38 @@ ThemeData samTheme() => ThemeData(
     isDense: true,
     labelStyle: const TextStyle(color: muted, fontSize: 10, letterSpacing: 1),
     border: const UnderlineInputBorder(borderSide: BorderSide(color: line)),
-    enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: line)),
-    focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: accent)),
+    enabledBorder: const UnderlineInputBorder(
+      borderSide: BorderSide(color: line),
+    ),
+    focusedBorder: const UnderlineInputBorder(
+      borderSide: BorderSide(color: accent),
+    ),
   ),
   splashFactory: NoSplash.splashFactory,
   highlightColor: Colors.transparent,
-  textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(
-    foregroundColor: accent, minimumSize: const Size(44, 44),
-    shape: const RoundedRectangleBorder(),
-    textStyle: const TextStyle(fontFamily: 'RobotoCondensed', fontSize: 11, letterSpacing: 1.2),
-  )),
+  textButtonTheme: TextButtonThemeData(
+    style: TextButton.styleFrom(
+      foregroundColor: accent,
+      minimumSize: const Size(44, 44),
+      shape: const RoundedRectangleBorder(),
+      textStyle: const TextStyle(
+        fontFamily: 'RobotoCondensed',
+        fontSize: 11,
+        letterSpacing: 1.2,
+      ),
+    ),
+  ),
   outlinedButtonTheme: OutlinedButtonThemeData(
     style: OutlinedButton.styleFrom(
       foregroundColor: accent,
       side: const BorderSide(color: Colors.transparent),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
       minimumSize: const Size(44, 44),
-      textStyle: const TextStyle(fontFamily: 'RobotoCondensed', fontSize: 12, letterSpacing: 1.1),
+      textStyle: const TextStyle(
+        fontFamily: 'RobotoCondensed',
+        fontSize: 12,
+        letterSpacing: 1.1,
+      ),
     ),
   ),
   dialogTheme: const DialogThemeData(

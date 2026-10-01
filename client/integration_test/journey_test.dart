@@ -10,7 +10,11 @@ import 'package:sam_client/ui/memory_core.dart';
 Future<void> waitFor(WidgetTester tester, Finder finder) async {
   for (var i = 0; i < 120; i++) {
     await tester.pump(const Duration(milliseconds: 100));
-    if (finder.evaluate().isNotEmpty) return;
+    if (finder.evaluate().isNotEmpty) {
+      // Display data exists before the 280ms scan redraw exposes its hitbox.
+      await tester.pump(const Duration(milliseconds: 400));
+      return;
+    }
   }
   expect(finder, findsWidgets);
 }
@@ -63,8 +67,13 @@ void main() {
       await waitFor(tester, find.byKey(const Key('pair-sequence')));
       await tester.pump(const Duration(milliseconds: 400));
       await binding.takeScreenshot('05a-pair-sequence');
-      final sequence = tester.widget<Text>(find.byKey(const Key('pair-sequence'))).data!.split(' / ').last.split(' ');
-      for(final glyph in sequence){
+      final sequence = tester
+          .widget<Text>(find.byKey(const Key('pair-sequence')))
+          .data!
+          .split(' / ')
+          .last
+          .split(' ');
+      for (final glyph in sequence) {
         await tester.ensureVisible(find.byKey(ValueKey('pair-$glyph')));
         await tester.tap(find.byKey(ValueKey('pair-$glyph')));
         await tester.pump(const Duration(milliseconds: 150));
@@ -120,7 +129,9 @@ void main() {
       final index = memories.indexWhere((r) => r.id == 'SYS.DEV-01');
       final angle = index / memories.length * math.pi * 2 - math.pi / 2;
       final radius = math.min(ring.width * .4, ring.height * .4);
-      await tester.tapAt(ring.center + Offset(math.cos(angle), math.sin(angle)) * radius);
+      await tester.tapAt(
+        ring.center + Offset(math.cos(angle), math.sin(angle)) * radius,
+      );
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.text('MEMORY / SYS.DEV-01'), findsOneWidget);
       await binding.takeScreenshot('09-memory-ring');
