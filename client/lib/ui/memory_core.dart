@@ -9,6 +9,7 @@ import 'terminal_actions.dart';
 class MemoryRecord {
   final String id, type, source, date, content;
   final String? nodeId;
+  final double? confidence;
   const MemoryRecord({
     required this.id,
     required this.type,
@@ -16,6 +17,7 @@ class MemoryRecord {
     required this.date,
     required this.content,
     this.nodeId,
+    this.confidence,
   });
 }
 
@@ -26,13 +28,14 @@ List<MemoryRecord> memoryRecords(SystemStore store) => [
       id: 'EVT.${event['cursor']}',
       type:
           event['category'] == 'DEVICE' &&
-              (event['message'] as String? ?? '').contains('SCAN')
-          ? 'FRAGMENT'
-          : 'EVENT',
+              (event['message'] as String? ?? '').contains('IDENTIFIED')
+          ? 'OBSERVATION'
+          : event['category'] == 'SECURITY' ? 'FRAGMENT' : 'EVENT',
       source: event['category'] as String? ?? 'SYSTEM',
       date: event['time'] as String? ?? 'UNKNOWN',
       nodeId: event['node_id'] as String?,
       content: event['message'] as String? ?? '',
+      confidence: (event['data']?['confidence'] as num?)?.toDouble(),
     ),
   for (final node in store.nodes.values)
     MemoryRecord(
@@ -45,23 +48,28 @@ List<MemoryRecord> memoryRecords(SystemStore store) => [
     ),
   const MemoryRecord(
     id: 'MEDIA.001',
-    type: 'MEDIA',
+    type: 'VISUAL',
     source: 'BUNDLED ORIGINAL MOCK SCENE',
     date: 'BUILD ASSET',
     content:
         'Pre-rendered optical simulation. This is an asset reference, not a captured recording.',
   ),
+  for (final module in store.nodes.values.where((n) => n.type == 'MODULE'))
+    MemoryRecord(id: 'REL.${module.id}', type: 'CONSTRUCTED', source: 'DETERMINISTIC NODE RELATION / NOT AI', date: 'CURRENT STATE', nodeId: module.id,
+      content: store.nodes.values.where((n) => n.module == module.id && n.id != module.id).map((n) => n.id).join(' → ')),
 ];
 Color memoryColor(String type) => switch (type) {
   'FRAGMENT' => SamTokens.amber,
   'EVENT' => SamTokens.blue,
-  'MEDIA' => const Color(0xffc5b1be),
+  'VISUAL' => const Color(0xffc5b1be),
+  'OBSERVATION' => accent,
   'CONSTRUCTED' => critical,
   _ => ink,
 };
 
 class MemoryCoreScreen extends StatefulWidget {
   final TerminalActions? actions;
+  final ValueChanged<bool>? onOperation;
   final SystemStore store;
   final ValueChanged<String> locate;
   const MemoryCoreScreen({
@@ -69,14 +77,25 @@ class MemoryCoreScreen extends StatefulWidget {
     required this.store,
     required this.locate,
     this.actions,
+    this.onOperation,
   });
   @override
   State<MemoryCoreScreen> createState() => _MemoryCoreScreenState();
 }
 
-class _MemoryCoreScreenState extends State<MemoryCoreScreen> {
+class _MemoryCoreScreenState extends State<MemoryCoreScreen> with SingleTickerProviderStateMixin {
   bool showRelations = true;
   String query = '', filter = 'ALL', selected = '';
+  String previous = '';
+  late final reindex = AnimationController(vsync: this, duration: const Duration(milliseconds: 260));
+  void selectMemory(String id) {
+    setState(() { previous = selected; selected = id; });
+    widget.onOperation?.call(id.isNotEmpty);
+    if (MediaQuery.disableAnimationsOf(context)) reindex.value = 1;
+    else reindex.forward(from: 0);
+  }
+  @override
+  void dispose() { reindex.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) {
     final records = memoryRecords(widget.store);
@@ -114,7 +133,7 @@ class _MemoryCoreScreenState extends State<MemoryCoreScreen> {
     widget.actions?.bind({
       'OPEN': shown.isEmpty
           ? null
-          : () => setState(() => selected = current?.id ?? shown.first.id),
+          : () => selectMemory(current?.id ?? shown.first.id),
       'RELATE': current == null
           ? null
           : () => setState(() => showRelations = !showRelations),
@@ -124,10 +143,12 @@ class _MemoryCoreScreenState extends State<MemoryCoreScreen> {
           ...records.map((r) => r.type).toSet(),
         ]);
         if (type != null && mounted) setState(() => filter = type);
+        if (mounted && selected.isNotEmpty) selectMemory('');
       },
       'TRACE': current?.nodeId == null
           ? null
           : () => widget.locate(current!.nodeId!),
+      if (current != null) 'RETURN': () => selectMemory(''),
     });
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -159,7 +180,7 @@ class _MemoryCoreScreenState extends State<MemoryCoreScreen> {
             decoration: const InputDecoration(
               labelText: 'MEMORY QUERY / ID · NODE · CONTENT',
             ),
-            onChanged: (v) => setState(() => query = v),
+            onChanged: (v) { setState(() => query = v); if (selected.isNotEmpty) selectMemory(''); },
           ),
         ),
         SingleChildScrollView(
@@ -169,9 +190,10 @@ class _MemoryCoreScreenState extends State<MemoryCoreScreen> {
               for (final type in [
                 'ALL',
                 'EVENT',
+                'OBSERVATION',
                 'FRAGMENT',
                 'SYSTEM',
-                'MEDIA',
+                'VISUAL',
                 'AUDIO',
                 'CONSTRUCTED',
               ])
@@ -180,7 +202,7 @@ class _MemoryCoreScreenState extends State<MemoryCoreScreen> {
                   selected: filter == type,
                   color: memoryColor(type),
                   onPressed: type == 'ALL' || records.any((r) => r.type == type)
-                      ? () => setState(() => filter = type)
+                      ? () { setState(() => filter = type); if (selected.isNotEmpty) selectMemory(''); }
                       : null,
                 ),
             ],
@@ -188,38 +210,37 @@ class _MemoryCoreScreenState extends State<MemoryCoreScreen> {
         ),
         Expanded(
           child: LayoutBuilder(
-            builder: (_, box) => GestureDetector(
+            builder: (_, box) => AnimatedBuilder(animation: reindex, builder: (_, __) => GestureDetector(
               key: const Key('memory-ring'),
               behavior: HitTestBehavior.opaque,
               onTapUp: (e) {
-                final size = Size(box.maxWidth, box.maxHeight),
-                    center = Offset(size.width / 2, size.height / 2);
-                final radius = math.min(size.width * .4, size.height * .4);
+                final size = Size(box.maxWidth, box.maxHeight);
+                final positions = memoryPositions(shown, size, selected, related.map((r) => r.id).toSet());
+                final before = memoryPositions(shown, size, previous, const {});
                 String? nearest;
                 var nearestDistance = 22.0;
                 for (var i = 0; i < shown.length; i++) {
-                  final a =
-                      i / math.max(1, shown.length) * math.pi * 2 - math.pi / 2;
-                  final p = center + Offset(math.cos(a), math.sin(a)) * radius;
+                  final p = Offset.lerp(before[shown[i].id], positions[shown[i].id], Curves.easeOut.transform(reindex.value))!;
                   final distance = (p - e.localPosition).distance;
                   if (distance < nearestDistance) {
                     nearest = shown[i].id;
                     nearestDistance = distance;
                   }
                 }
-                if (nearest != null) setState(() => selected = nearest!);
+                if (nearest != null) selectMemory(nearest!);
               },
               child: CustomPaint(
                 size: Size(box.maxWidth, box.maxHeight),
                 painter: _MemoryRing(
                   records: shown,
                   selected: selected,
+                  previous: previous, progress: reindex.value,
                   relations: showRelations
                       ? related.map((r) => r.id).toSet()
                       : {},
                 ),
               ),
-            ),
+            )),
           ),
         ),
         Padding(
@@ -242,7 +263,7 @@ class _MemoryCoreScreenState extends State<MemoryCoreScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${current.source}\n${current.date}\nNODE ${current.nodeId ?? '—'} / RELATIONS ${related.length}',
+                      'SOURCE / ${current.source}\nTIMESTAMP / ${current.date}\nTYPE / ${current.type}\nNODE / ${current.nodeId ?? '—'}   RELATED / ${related.length}\nCONFIDENCE / ${current.confidence?.toStringAsFixed(2) ?? 'NOT SCORED'}',
                       style: const TextStyle(
                         fontSize: 9,
                         color: muted,
@@ -272,10 +293,13 @@ class _MemoryRing extends CustomPainter {
   final List<MemoryRecord> records;
   final String selected;
   final Set<String> relations;
+  final String previous;
+  final double progress;
   _MemoryRing({
     required this.records,
     required this.selected,
     required this.relations,
+    required this.previous, required this.progress,
   });
   @override
   void paint(Canvas canvas, Size size) {
@@ -291,13 +315,20 @@ class _MemoryRing extends CustomPainter {
       radius + 8,
       pen..color = line.withValues(alpha: .4),
     );
-    final positions = <String, Offset>{};
-    for (var i = 0; i < records.length; i++) {
-      final a = i / math.max(1, records.length) * math.pi * 2 - math.pi / 2;
-      positions[records[i].id] =
-          center + Offset(math.cos(a), math.sin(a)) * radius;
-    }
+    final positions = memoryPositions(records, size, selected, relations);
+    final before = memoryPositions(records, size, previous, const {});
+    for (final id in positions.keys) { positions[id] = Offset.lerp(before[id], positions[id], Curves.easeOut.transform(progress))!; }
     final current = records.where((r) => r.id == selected).firstOrNull;
+    final byNode = <String, String>{};
+    var baseLines = 0;
+    for (final record in records) {
+      final node = record.nodeId;
+      if (node == null) continue;
+      final other = byNode[node];
+      if (other != null && baseLines++ < 24) {
+        canvas.drawLine(positions[other]!, positions[record.id]!, pen..color = memoryColor(record.type).withValues(alpha: .12));
+      } else { byNode[node] = record.id; }
+    }
     if (current?.nodeId != null) {
       for (final r in records.where((r) => relations.contains(r.id))) {
         final a = positions[current!.id]!, b = positions[r.id]!;
@@ -314,12 +345,12 @@ class _MemoryRing extends CustomPainter {
       final r = records[i], p = positions[r.id]!, active = r.id == selected;
       canvas.drawCircle(
         p,
-        active ? 7 : 2.5,
+        active ? 7 : relations.contains(r.id) ? 3.5 : 2.5,
         Paint()..color = memoryColor(r.type).withValues(alpha: active ? 1 : .6),
       );
       if (active) {
         canvas.drawCircle(p, 13, pen..color = ink);
-        drawLabel(canvas, r.id, p + const Offset(16, -6), ink, size: 10);
+        drawLabel(canvas, r.id, p + Offset(p.dx > center.dx ? -80 : 16, p.dy < 18 ? 16 : -6), ink, size: 9);
       } else if (i % 7 == 0)
         drawLabel(
           canvas,
@@ -336,8 +367,20 @@ class _MemoryRing extends CustomPainter {
       muted,
       size: 8,
     );
+    final core = TextPainter(text: const TextSpan(text: 'MEMORY CORE\nASSOCIATIVE INDEX', style: TextStyle(fontFamily: 'RobotoMono', fontSize: 8, letterSpacing: 1.3, height: 2, color: muted)), textAlign: TextAlign.center, textDirection: TextDirection.ltr)..layout();
+    core.paint(canvas, center - Offset(core.width / 2, core.height / 2));
   }
 
   @override
   bool shouldRepaint(covariant _MemoryRing oldDelegate) => true;
+}
+
+Map<String, Offset> memoryPositions(List<MemoryRecord> records, Size size, String selected, Set<String> relations) {
+  final ordered = selected.isEmpty ? records : [
+    ...records.where((r) => r.id == selected),
+    ...records.where((r) => r.id != selected && relations.contains(r.id)),
+    ...records.where((r) => r.id != selected && !relations.contains(r.id)),
+  ];
+  final center = Offset(size.width / 2, size.height / 2), radius = math.min(size.width * .4, size.height * .4);
+  return {for (var i = 0; i < ordered.length; i++) ordered[i].id: center + Offset(math.cos(i / math.max(1, ordered.length) * math.pi * 2 - math.pi / 2), math.sin(i / math.max(1, ordered.length) * math.pi * 2 - math.pi / 2)) * radius};
 }

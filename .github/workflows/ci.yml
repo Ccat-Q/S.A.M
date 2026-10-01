@@ -111,7 +111,7 @@ jobs:
             client/pubspec.lock
           if-no-files-found: warn
       - name: Save native compilation cache
-        if: always() && steps.client.outputs.xcode-key != '' && steps.client.outputs.xcode-hit != 'true'
+        if: success() && steps.client.outputs.xcode-key != '' && steps.client.outputs.xcode-hit != 'true'
         continue-on-error: true
         timeout-minutes: 2
         uses: actions/cache/save@v5
@@ -185,7 +185,7 @@ jobs:
             client/build/integration_test/
           if-no-files-found: warn
       - name: Save native compilation cache
-        if: always() && steps.client.outputs.xcode-key != '' && steps.client.outputs.xcode-hit != 'true'
+        if: success() && steps.client.outputs.xcode-key != '' && steps.client.outputs.xcode-hit != 'true'
         continue-on-error: true
         timeout-minutes: 2
         uses: actions/cache/save@v5

@@ -1,4 +1,29 @@
 """Original facility: four industrial modules, not the game's station."""
+from datetime import datetime, timedelta, timezone
+
+
+def mock_alert_history():
+    """Explicit simulation fixtures, not observed faults or live exceptions."""
+    at = datetime.now(timezone.utc)
+    examples = [("CAM-03", "SIGNAL_LOSS", "WARNING", "RESTORED", 21),
+                ("DEV-01", "OUTPUT_DEVIATION", "WARNING", "ACKNOWLEDGED", 43),
+                ("NET-05", "NETWORK_LINK", "NOTICE", "RECOVERED", 128)]
+    return [{"id": f"MOCK-HISTORY-{i + 1:02}", "node_id": node, "condition": condition,
+             "severity": severity, "state": "RESOLVED", "source": "MOCK_HISTORY",
+             "created_at": (at - timedelta(minutes=minutes)).isoformat(),
+             "resolved_at": (at - timedelta(minutes=minutes - 2)).isoformat(),
+             "resolution": resolution, "acknowledged_by": "SIMULATION"}
+            for i, (node, condition, severity, resolution, minutes) in enumerate(examples)]
+
+
+def ensure_mock_history(data):
+    # One-time additive seed for existing mock scenes. Preserve every real event.
+    if data.get("mock_history_seeded"):
+        return False
+    present = {a["id"] for a in data["alerts"]}
+    data["alerts"].extend(a for a in mock_alert_history() if a["id"] not in present)
+    data["mock_history_seeded"] = True
+    return True
 
 
 def initial_scene():
@@ -52,4 +77,6 @@ def initial_scene():
         targets = [n for n in nodes if n["module_id"] == cam["module_id"] and n["type"] == "DEVICE"]
         cameras[cam["id"]] = [{"node_id": n["id"], "x": 0.15 + j * 0.27, "y": 0.28 + (j % 2) * 0.2,
                               "width": 0.2, "height": 0.25} for j, n in enumerate(targets)]
-    return {"nodes": nodes, "edges": edges, "camera_targets": cameras, "alerts": []}
+    data = {"nodes": nodes, "edges": edges, "camera_targets": cameras, "alerts": []}
+    ensure_mock_history(data)
+    return data

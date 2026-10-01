@@ -25,10 +25,20 @@ class _InspectorState extends State<Inspector> {
   String? pairingNode;
   int? pairingGeneration;
   Map<String, dynamic>? diagnostic;
+  String? linkPhase;
   String get identity =>
       '${identityHashCode(widget.store)}:${widget.store.user?['id']}:${widget.store.generation}:${widget.store.selectedId}';
   Future<void> connect() async {
+    if (linkPhase != null) return;
+    final id = widget.store.selectedId, generation = widget.store.generation;
     await report(context, () async {
+      for (final phase in ['HANDSHAKE', 'AUTH']) {
+        if (!mounted || widget.store.selectedId != id || widget.store.generation != generation || !widget.store.connected) return;
+        setState(() => linkPhase = phase);
+        if (!MediaQuery.disableAnimationsOf(context)) await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+      if (!mounted || widget.store.selectedId != id || widget.store.generation != generation || !widget.store.connected) return;
+      setState(() => linkPhase = 'CHANNEL');
       await widget.store.link();
       if (widget.store.linked) {
         if (knownInterfaces.length > 128) knownInterfaces.clear();
@@ -38,7 +48,7 @@ class _InspectorState extends State<Inspector> {
         );
       }
     });
-    if (mounted) setState(() => sequence = null);
+    if (mounted) setState(() { sequence = null; linkPhase = null; });
   }
 
   void pair() {
@@ -251,7 +261,7 @@ class _InspectorState extends State<Inspector> {
                 label: knownInterfaces.contains(identity)
                     ? 'QUICK PAIR / REQUEST LINK'
                     : 'PAIR / REQUEST SYSTEM LINK',
-                onPressed: store.connected && store.stage != 'AUTHENTICATING'
+                onPressed: store.connected && store.stage != 'AUTHENTICATING' && linkPhase == null
                     ? pair
                     : null,
               )
@@ -268,7 +278,7 @@ class _InspectorState extends State<Inspector> {
               ),
               const SizedBox(height: 8),
               Text(
-                '${List.filled(progress, '■').join()}${List.filled(3 - progress, '░').join()} / ${progress == 3 ? 'AUTH CHANNEL / WAIT' : 'TOUCH IN ORDER'}',
+                '${List.filled(progress, '■').join()}${List.filled(3 - progress, '░').join()} / ${linkPhase ?? (progress == 3 ? 'AUTH CHANNEL / WAIT' : 'TOUCH IN ORDER')}',
                 style: const TextStyle(fontSize: 10, color: accent),
               ),
               Wrap(

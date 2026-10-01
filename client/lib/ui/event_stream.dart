@@ -36,8 +36,8 @@ class EventStream extends StatelessWidget {
                   style: TextStyle(fontSize: 9, color: muted),
                 ),
               for (var i = 0; i < events.length; i++)
-                Padding(
-                  padding: const EdgeInsets.only(top: 3),
+                Expanded(child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
                   child: Text(
                     '${_time(events[i]['time'])}  ${events[i]['category']} / ${events[i]['node_id'] ?? 'CORE'}\n${events[i]['message']}',
                     maxLines: 2,
@@ -48,7 +48,7 @@ class EventStream extends StatelessWidget {
                       color: accent.withValues(alpha: 1 - i * .26),
                     ),
                   ),
-                ),
+                )),
             ],
           ),
         ),

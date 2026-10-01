@@ -55,3 +55,6 @@
 - 实时事件队列去重、限制为四条并在 generation 重置时清空；不进入虚构的审计记录。SYS uptime 持续递增。
 - iOS 联机旅程开启原有周期遥测，末尾验证已收到 TELEMETRY、uptime 发生增长，并导出 `11-overview-live`。服务端单元测试仍关闭后台模拟器以保持可复现。
 - 首次重构修复后 Actions 231dddf 整体 7分06秒、iOS 构建 3分23秒、iOS 联机验收 6分52秒全部通过；后续运行继续测量，不把一次耗时当成每次 runner 的保证。
+
+
+本轮追加验收：进入 Camera 不继承预识别状态；Feed 占 Shell 高度超过 70%；Channel A/B 切换后完成同步；SCAN 在 Feed 内返回身份且不提前获得控制；Alert 当前为零但历史仍有三条 Mock 事件；矩阵选中进入详情后隐藏导航并可返回；Memory 选中隐藏导航、关系重排、RETURN 恢复模块。保留原有故障恢复与审计端到端链。Event Stream 的三条事件高度受约束，不产生 RenderFlex 溢出。新增光学入口控件回归测试，原有安全协议测试继续执行。

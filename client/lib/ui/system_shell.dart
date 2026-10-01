@@ -22,6 +22,7 @@ class _SystemShellState extends State<SystemShell> {
   int page = 0;
   String? logNode;
   bool fullscreen = false;
+  bool operation = false;
   final uptimeClock = Stopwatch()..start();
   Timer? clock;
   static const names = [
@@ -50,7 +51,11 @@ class _SystemShellState extends State<SystemShell> {
   }
 
   void navigate(int next) {
-    setState(() { page = next; if (![1,2,8].contains(next)) fullscreen = false; });
+    setState(() { page = next; operation = false; if (![1,2,8].contains(next)) fullscreen = false; });
+  }
+
+  void operationDepth(bool active) {
+    if (mounted && operation != active) setState(() => operation = active);
   }
 
   void locate(String id) {
@@ -102,7 +107,7 @@ class _SystemShellState extends State<SystemShell> {
               color: background,
               child: SizedBox(
                 width: wide ? 420 : double.infinity,
-                height: MediaQuery.sizeOf(c).height * .93,
+                height: MediaQuery.sizeOf(c).height,
                 child: DecoratedBox(
                   decoration: const BoxDecoration(
                     border: Border(
@@ -117,7 +122,7 @@ class _SystemShellState extends State<SystemShell> {
                           const SizedBox(width: 18),
                           const Expanded(
                             child: Text(
-                              'CONTROL TERMINAL / OVERLAY',
+                              'SAM.LINK / NATIVE CONTROL / LEVEL 03',
                               style: TextStyle(
                                 color: muted,
                                 fontSize: 8,
@@ -224,7 +229,7 @@ class _SystemShellState extends State<SystemShell> {
       0 => ['DETAIL','LOG','DIAG','RELOC','COMMAND'],
       1 => ['SELECT','CAMERA','TRACE','FILTER','RETURN'],
       2 => ['ANGLE','SCAN','LINK','TRACK','EXIT'],
-      3 => ['LOCATE','CAMERA','LINK','ACK',store.alerts.any((a)=>a['state']!='RESOLVED') ? 'LOG' : 'HISTORY'],
+      3 => ['LOCATE','CAMERA','LINK','ACK','HISTORY'],
       7 => ['SELECT','TRACE','FILTER','INSPECT','RETURN'],
       8 => ['OPEN','RELATE','FILTER','TRACE','RETURN'],
       _ => ['DETAIL','LOG','RELOC','SETTINGS','RETURN'],
@@ -249,12 +254,13 @@ class _SystemShellState extends State<SystemShell> {
         inspect: inspect,
         logs: logs,
         actions: actions,
+        onOperation: operationDepth,
       ),
       4 => DevicesScreen(store: store, inspect: inspect, locate: locate),
       5 => LogsScreen(key: ValueKey(logNode), store: store, nodeId: logNode),
       6 => SettingsScreen(store: store),
       7 => NetworkScreen(store: store, inspect: inspect, actions: actions),
-      _ => MemoryCoreScreen(store: store, locate: locate, actions: actions),
+      _ => MemoryCoreScreen(store: store, locate: locate, actions: actions, onOperation: operationDepth),
     };
     return Scaffold(
       body: SafeArea(
@@ -263,14 +269,14 @@ class _SystemShellState extends State<SystemShell> {
           child: Column(
             children: [
               SizedBox(
-                height: 44,
+                height: page == 2 || operation ? 28 : 44,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   child: Row(
                     children: [
-                      const Text(
-                        'SAM.OS / REV 02.0',
-                        style: TextStyle(
+                      Text(
+                        page == 2 ? 'SAM.OS / OPTICAL CHANNEL' : operation ? 'SAM.OS / OPERATION 02' : 'SAM.OS / REV 02.0',
+                        style: const TextStyle(
                           fontSize: 8,
                           color: muted,
                           letterSpacing: 1.3,
@@ -284,7 +290,7 @@ class _SystemShellState extends State<SystemShell> {
                       ),
                       const SizedBox(width: 14),
                       StatusLamp(store.connected ? 'ONLINE' : 'OFFLINE'),
-                      if ([1, 2, 8].contains(page))
+                      if ([1, 8].contains(page) && !operation)
                         SizedBox(
                           width: 48,
                           child: SoftKey(
@@ -297,7 +303,7 @@ class _SystemShellState extends State<SystemShell> {
                   ),
                 ),
               ),
-              if (!fullscreen)
+              if (!fullscreen && page != 2 && !operation)
                 Container(
                   decoration: const BoxDecoration(
                     border: Border(bottom: BorderSide(color: line, width: .6)),

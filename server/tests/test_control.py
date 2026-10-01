@@ -27,6 +27,8 @@ def test_seed_and_permissions(client, admin):
     snap = client.get("/api/snapshot", headers=admin).json()
     assert len(snap["nodes"]) == 42
     assert len({n["id"] for n in snap["nodes"]}) == 42
+    assert len(snap["alerts"]) == 3
+    assert all(a["state"] == "RESOLVED" and a["source"] == "MOCK_HISTORY" for a in snap["alerts"])
     observer = login(client, "observer")
     assert client.post("/api/nodes/DEV-02/scan", headers=observer).status_code == 200
     assert client.post("/api/links", headers=observer, json={"node_id": "DEV-02", "generation": 1, "scan_id": "invalid"}).status_code == 403
@@ -49,7 +51,7 @@ def test_link_version_idempotency_and_five_clients(client, admin):
 def test_alert_ack_control_recovery(client, admin):
     client.post("/api/simulation", headers=admin, json={"action": "scenario"})
     snap = client.get("/api/snapshot", headers=admin).json()
-    alert = next(a for a in snap["alerts"] if a["node_id"] == "DEV-01")
+    alert = next(a for a in snap["alerts"] if a["node_id"] == "DEV-01" and a["state"] == "ACTIVE")
     camera = next(n for n in snap["nodes"] if n["id"] == "CAM-01")
     assert camera["telemetry"]["signal"] == 0 and camera["telemetry"]["fps"] == 0
     assert next(n for n in snap["nodes"] if n["id"] == "SEN-03")["telemetry"]["temperature"] == 86.0
@@ -129,6 +131,7 @@ def test_restart_preserves_state_and_audit_but_invalidates_link(client, admin):
     result = client.post("/api/commands", headers=admin, json=req).json()
     with TestClient(app) as restarted:
         snap = restarted.get("/api/snapshot", headers=admin).json()
+        assert len([a for a in snap["alerts"] if a.get("source") == "MOCK_HISTORY"]) == 3
         assert next(n for n in snap["nodes"] if n["id"] == "DEV-02")["controls"]["door"] == "open"
         assert restarted.get(f"/api/commands/by-key/{req['key']}", headers=admin).json()["id"] == result["id"]
         assert restarted.post("/api/commands", headers=admin, json={**req, "key": str(uuid4()), "expected_version": 2}).json()["detail"] == "LINK_REQUIRED"

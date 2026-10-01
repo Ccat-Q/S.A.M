@@ -9,6 +9,8 @@ import 'package:sam_client/ui/inspector.dart';
 import 'package:sam_client/ui/map_display.dart';
 import 'package:sam_client/ui/theme.dart';
 import 'package:sam_client/ui/system_shell.dart';
+import 'package:sam_client/ui/camera_screen.dart';
+import 'package:sam_client/ui/terminal_actions.dart';
 
 Map<String, dynamic> fixture() => {
   'nodes': [
@@ -96,7 +98,8 @@ void main() {
       expect(find.byKey(const Key('soft-COMMAND')), findsNothing);
       await tester.tap(find.byKey(const Key('tab-3')));
       await tester.pump(const Duration(milliseconds: 500));
-      expect(find.text('ACTIVE ALERTS'), findsOneWidget);
+      expect(find.text('ALERT REGISTER'), findsOneWidget);
+      expect(find.text('NO ACTIVE EXCEPTIONS'), findsOneWidget);
       expect(find.textContaining('STATUS / ARMED'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       store.dispose();
@@ -309,6 +312,9 @@ void main() {
         if (i < 2) expect(linkRequests, 0);
       }
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump();
       expect(linkRequests, 1);
       expect(store.linked, isTrue);
       await tester.pump(const Duration(seconds: 6));
@@ -316,6 +322,46 @@ void main() {
       store.dispose();
     },
   );
+  testWidgets('optical entry does not inherit identification; scan stays in feed', (tester) async {
+    final data = fixture();
+    final device = Map<String, dynamic>.from((data['nodes'] as List).first as Map);
+    (data['nodes'] as List).add({
+      ...device, 'id': 'CAM-01', 'type': 'CAMERA', 'subtype': 'CAMERA',
+      'controls': {'pan': 0, 'tilt': 0, 'zoom': 1},
+      'telemetry': {'signal': 92, 'fps': 30, 'latency': 18},
+    });
+    data['camera_targets'] = {'CAM-01': [{'node_id': 'DEV-01', 'x': .3, 'y': .3, 'width': .2, 'height': .2}]};
+    final api = SamApi('https://example.com', client: MockClient((request) async {
+      expect(request.url.path, '/api/nodes/DEV-01/scan');
+      return http.Response(jsonEncode({'node': device, 'scan_id': 'receipt'}), 200);
+    }));
+    final store = SystemStore(api: api, persist: false)..loadSnapshot(data)..selectNode('DEV-01');
+    store.connected = true;
+    store.scannedId = 'DEV-01';
+    final actions = TerminalActions();
+    var terminals = 0;
+    await tester.pumpWidget(MaterialApp(theme: samTheme(), home: Scaffold(body: CameraScreen(store: store, actions: actions, inspect: (_) => terminals++))));
+    expect(find.text('OBSERVE / ACQUIRE TARGET'), findsOneWidget);
+    expect(find.textContaining('CLASS POWER'), findsNothing);
+    actions.invoke('SCAN');
+    await tester.pump();
+    expect(terminals, 0);
+    await tester.tap(find.byKey(const Key('target-DEV-01')));
+    await tester.pump();
+    expect(find.text('TARGET CANDIDATE / SCAN REQUIRED'), findsOneWidget);
+    actions.invoke('SCAN');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+    expect(find.textContaining('CLASS POWER'), findsOneWidget);
+    expect(store.linked, isFalse);
+    expect(terminals, 0);
+    actions.invoke('LINK');
+    expect(terminals, 1);
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pumpWidget(const SizedBox.shrink());
+    store.dispose();
+  });
   test('typed transport preserves error codes and request identity', () async {
     final api = SamApi(
       'https://example.com',

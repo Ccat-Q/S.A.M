@@ -12,6 +12,7 @@ from uuid import uuid4
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm.attributes import flag_modified
 
 from . import simulator
 from .auth import (authenticate, aware, current_user, issue_session, member_dict, passwords,
@@ -21,7 +22,7 @@ from .control import changes, execute, node, prepare, recompute
 from .models import Command, Confirmation, Event, Link, Scan, Scene, Session, User, now
 from .schemas import (CommandRequest, FaultRequest, LinkRequest, LoginRequest,
                       MemberCreate, MemberUpdate, SimulationRequest)
-from .seed import initial_scene
+from .seed import ensure_mock_history, initial_scene
 from .store import SessionFactory, emit, event_dict, locked_scene, snapshot, transaction
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,8 @@ login_lock = Lock()
 async def lifespan(app):
     with transaction() as db:
         scene = locked_scene(db)
+        if ensure_mock_history(scene.data):
+            flag_modified(scene, "data")
         # Process restarts never preserve control grants or confirmation tokens.
         db.execute(delete(Link))
         db.execute(delete(Confirmation))
@@ -304,6 +307,7 @@ def simulation(body: SimulationRequest, user=Depends(require_admin)):
                     a.update(state="RESOLVED", resolved_at=now().isoformat(), resolution="SCENE_RESET")
             scene.data = initial_scene()
             scene.data["alerts"] = history
+            ensure_mock_history(scene.data)
             scene.generation += 1
             scene.tick, scene.paused = 0, False
             db.execute(delete(Link))

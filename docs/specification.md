@@ -45,3 +45,6 @@ ACTIVE → ACKNOWLEDGED → RESOLVED。ACK 记录接手人而不清除故障；�
 按用户明确要求，以开放黑场、空间站线框、真实感预渲染 Camera、设备专用终端和径向 Memory 关系场替代统一 Dashboard Panel。现有 42 个 Node、权限、模拟、状态、设备控制及保留策略不变。Memory 首轮只读投影来自现有持久化日志和 Node/edges；不表示已实现 AI、录音、录像或新的长期记忆服务。详见 design.md 和 ADR 0005。
 
 运行感迭代保持上述视觉，底部改成上下文 Soft Keys；增加有实际事件依据的 bounded queue、非对称设施几何、轻周期绘制、告警待机监测及老旧 CCTV 效果。手动 target lock 属于客户端选取行为，不是自动实体追踪。所有已有管理入口保留在 SYSTEM / COMMAND 索引中。
+
+
+操作层级迭代：冻结 Overview，Camera 默认 Optical Operation，Alert 使用 Register 与时间 × 模块矩阵，Memory 选中节点重排。历史包含三条明确标记的持久化 Mock 种子事件；当前异常数仍为零。API 的 Scan/Link/角色/幂等与高影响确认不变，详细交互见 design.md。
