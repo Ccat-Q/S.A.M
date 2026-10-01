@@ -36,6 +36,13 @@ ThemeData samTheme() => ThemeData(
     ),
   ),
   dividerColor: line,
+  dividerTheme: const DividerThemeData(color: line, thickness: 1),
+  snackBarTheme: const SnackBarThemeData(
+    backgroundColor: surface,
+    contentTextStyle: TextStyle(color: ink, fontFamily: 'RobotoMono'),
+    shape: RoundedRectangleBorder(side: BorderSide(color: line)),
+    elevation: 0,
+  ),
   inputDecorationTheme: InputDecorationTheme(
     filled: true,
     fillColor: surface,

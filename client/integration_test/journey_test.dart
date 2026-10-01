@@ -66,6 +66,7 @@ void main() {
       await tester.ensureVisible(find.byKey(const Key('recover-device')));
       await tester.tap(find.byKey(const Key('recover-device')));
       await waitFor(tester, find.byKey(const Key('confirm-command')));
+      await tester.pump(const Duration(milliseconds: 400));
       await binding.takeScreenshot('06-impact-confirmation');
       await tester.tap(find.byKey(const Key('confirm-command')));
       for (var i = 0; i < 100 && store.nodes['DEV-01']!.fault != null; i++) {
