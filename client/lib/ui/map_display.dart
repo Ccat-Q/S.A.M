@@ -61,7 +61,7 @@ class MapDisplay extends StatelessWidget {
         child: GestureDetector(
           onTapUp: (e) {
             String? nearest;
-            double best = 36;
+            double best = math.max(36.0, 22 / (controller?.value.getMaxScaleOnAxis() ?? 1));
             for (final p in positions.entries) {
               if (visible != null && !visible!.contains(p.key)) continue;
               final d = (p.value - e.localPosition).distance;

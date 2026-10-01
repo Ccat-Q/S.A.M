@@ -204,7 +204,7 @@ class SoftKey extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,

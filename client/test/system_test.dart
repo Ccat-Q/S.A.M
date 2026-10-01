@@ -44,39 +44,64 @@ Map<String, dynamic> fixture() => {
 };
 
 void main() {
-  test('live event queue is bounded, deduplicated and invalidated on reset', () {
-    final store = SystemStore(persist: false)..loadSnapshot(fixture());
-    for (var i = 0; i < 7; i++) {
-      final packet = {'type': 'events', 'cursor': i+10, 'events': [
-        {'cursor': i+10, 'time': '2026-10-01T00:00:0$i.000Z', 'category': 'TELEMETRY',
-          'message': 'SENSOR FRAME RECEIVED', 'data': {'generation': 1, 'tick': i*3}},
-      ]};
-      store.receivePacket(packet); store.receivePacket(packet);
-    }
-    expect(store.displayEvents.length, 4);
-    expect(store.displayEvents.first['cursor'], 16);
-    expect(store.logs, isEmpty);
-    store.loadSnapshot(fixture()..['generation']=2..['cursor']=20);
-    expect(store.displayEvents, isEmpty);
-    store.dispose();
-  });
-  testWidgets('soft keys follow the display and empty alert channel stays armed', (tester) async {
-    final store = SystemStore(persist: false)..loadSnapshot(fixture());
-    store.connected = true;
-    await tester.pumpWidget(MaterialApp(theme: samTheme(), home: SystemShell(store: store)));
-    expect(find.byKey(const Key('soft-COMMAND')), findsOneWidget);
-    expect(find.byKey(const Key('soft-SYS')), findsNothing);
-    await tester.tap(find.byKey(const Key('soft-RELOC')));
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(find.byKey(const Key('soft-CAMERA')), findsOneWidget);
-    expect(find.byKey(const Key('soft-COMMAND')), findsNothing);
-    await tester.tap(find.byKey(const Key('tab-3')));
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(find.text('ACTIVE ALERTS'), findsOneWidget);
-    expect(find.textContaining('STATUS / ARMED'), findsOneWidget);
-    await tester.pumpWidget(const SizedBox.shrink());
-    store.dispose();
-  });
+  test(
+    'live event queue is bounded, deduplicated and invalidated on reset',
+    () {
+      final store = SystemStore(persist: false)..loadSnapshot(fixture());
+      for (var i = 0; i < 7; i++) {
+        final packet = {
+          'type': 'events',
+          'cursor': i + 10,
+          'events': [
+            {
+              'cursor': i + 10,
+              'time': '2026-10-01T00:00:0$i.000Z',
+              'category': 'TELEMETRY',
+              'message': 'SENSOR FRAME RECEIVED',
+              'data': {'generation': 1, 'tick': i * 3},
+            },
+          ],
+        };
+        store.receivePacket(packet);
+        store.receivePacket(packet);
+      }
+      expect(store.displayEvents.length, 4);
+      expect(store.displayEvents.first['cursor'], 16);
+      expect(store.logs, isEmpty);
+      store.loadSnapshot(
+        fixture()
+          ..['generation'] = 2
+          ..['cursor'] = 20,
+      );
+      expect(store.displayEvents, isEmpty);
+      store.dispose();
+    },
+  );
+  testWidgets(
+    'soft keys follow the display and empty alert channel stays armed',
+    (tester) async {
+      final store = SystemStore(persist: false)..loadSnapshot(fixture());
+      store.connected = true;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: samTheme(),
+          home: SystemShell(store: store),
+        ),
+      );
+      expect(find.byKey(const Key('soft-COMMAND')), findsOneWidget);
+      expect(find.byKey(const Key('soft-SYS')), findsNothing);
+      await tester.tap(find.byKey(const Key('soft-RELOC')));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byKey(const Key('soft-CAMERA')), findsOneWidget);
+      expect(find.byKey(const Key('soft-COMMAND')), findsNothing);
+      await tester.tap(find.byKey(const Key('tab-3')));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.text('ACTIVE ALERTS'), findsOneWidget);
+      expect(find.textContaining('STATUS / ARMED'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+      store.dispose();
+    },
+  );
   test(
     'queued stream events cannot roll back an HTTP snapshot or duplicate logs',
     () {

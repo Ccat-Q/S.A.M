@@ -92,10 +92,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
         '${n.module} / ${n.status} / ${n.telemetry['temperature']} °C',
         style: const TextStyle(color: muted, fontSize: 10),
       ),
-      trailing: SoftKey(
-        label: 'LOCATE',
-        onPressed: () => widget.locate(id),
-      ),
+      trailing: SoftKey(label: 'LOCATE', onPressed: () => widget.locate(id)),
     );
   }
 }

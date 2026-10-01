@@ -56,7 +56,7 @@ class _InspectorState extends State<Inspector> {
   }
 
   void press(String glyph) {
-    if (sequence == null ||
+    if (sequence == null || progress >= 3 ||
         widget.store.selectedId != pairingNode ||
         widget.store.generation != pairingGeneration ||
         !widget.store.connected)

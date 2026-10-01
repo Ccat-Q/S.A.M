@@ -52,9 +52,31 @@ class CameraDisplay extends StatelessWidget {
                 Positioned.fill(
                   child: Transform(
                     transform: matrix,
-                    child: ColorFiltered(colorFilter: const ColorFilter.matrix([
-                      .90,.075,.025,0,0, .075,.90,.025,0,0, .075,.15,.775,0,0, 0,0,0,1,0,
-                    ]), child: Image.asset(cameraAsset(camera), fit: BoxFit.fill)),
+                    child: ColorFiltered(
+                      colorFilter: const ColorFilter.matrix([
+                        .90,
+                        .075,
+                        .025,
+                        0,
+                        0,
+                        .075,
+                        .90,
+                        .025,
+                        0,
+                        0,
+                        .075,
+                        .15,
+                        .775,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        1,
+                        0,
+                      ]),
+                      child: Image.asset(cameraAsset(camera), fit: BoxFit.fill),
+                    ),
                   ),
                 ),
               if (camera.status != 'OFFLINE' && store.chromatic)
@@ -84,7 +106,13 @@ class CameraDisplay extends StatelessWidget {
                   ),
                 ),
               if (camera.status != 'OFFLINE' && !thumbnail)
-                Positioned.fill(child: VideoTexture(crt: store.crt, noise: store.noise, glitch: store.glitch)),
+                Positioned.fill(
+                  child: VideoTexture(
+                    crt: store.crt,
+                    noise: store.noise,
+                    glitch: store.glitch,
+                  ),
+                ),
               if (camera.status != 'OFFLINE' && !thumbnail)
                 Positioned.fill(
                   child: Transform(

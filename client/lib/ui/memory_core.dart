@@ -112,13 +112,22 @@ class _MemoryCoreScreenState extends State<MemoryCoreScreen> {
         )
         .toList();
     widget.actions?.bind({
-      'OPEN': shown.isEmpty ? null : () => setState(() => selected = current?.id ?? shown.first.id),
-      'RELATE': current == null ? null : () => setState(() => showRelations = !showRelations),
+      'OPEN': shown.isEmpty
+          ? null
+          : () => setState(() => selected = current?.id ?? shown.first.id),
+      'RELATE': current == null
+          ? null
+          : () => setState(() => showRelations = !showRelations),
       'FILTER': () async {
-        final type = await terminalSelect(context, 'MEMORY TYPE', ['ALL',...records.map((r)=>r.type).toSet()]);
+        final type = await terminalSelect(context, 'MEMORY TYPE', [
+          'ALL',
+          ...records.map((r) => r.type).toSet(),
+        ]);
         if (type != null && mounted) setState(() => filter = type);
       },
-      'TRACE': current?.nodeId == null ? null : () => widget.locate(current!.nodeId!),
+      'TRACE': current?.nodeId == null
+          ? null
+          : () => widget.locate(current!.nodeId!),
     });
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -129,7 +138,7 @@ class _MemoryCoreScreenState extends State<MemoryCoreScreen> {
             children: [
               const Expanded(
                 child: Text(
-              'MEMORY / CORE',
+                  'MEMORY / CORE',
                   style: TextStyle(
                     fontFamily: 'RobotoCondensed',
                     fontSize: 16,
@@ -138,7 +147,7 @@ class _MemoryCoreScreenState extends State<MemoryCoreScreen> {
                 ),
               ),
               Text(
-            'MEM.CORE.00 / INDEX ${shown.length.toString().padLeft(4, '0')}',
+                'MEM.CORE.00 / INDEX ${shown.length.toString().padLeft(4, '0')}',
                 style: const TextStyle(color: muted, fontSize: 9),
               ),
             ],
@@ -205,7 +214,9 @@ class _MemoryCoreScreenState extends State<MemoryCoreScreen> {
                 painter: _MemoryRing(
                   records: shown,
                   selected: selected,
-                  relations: showRelations ? related.map((r) => r.id).toSet() : {},
+                  relations: showRelations
+                      ? related.map((r) => r.id).toSet()
+                      : {},
                 ),
               ),
             ),

@@ -16,6 +16,7 @@ class _TerminalSurfaceState extends State<TerminalSurface>
     with SingleTickerProviderStateMixin {
   late final AnimationController cycle;
   Offset? cursor;
+  DateTime? touchedAt;
   Timer? clearCursor;
   @override
   void initState() {
@@ -45,7 +46,7 @@ class _TerminalSurfaceState extends State<TerminalSurface>
 
   void target(Offset p, {bool transient = false}) {
     clearCursor?.cancel();
-    setState(() => cursor = p);
+    setState(() { cursor = p; touchedAt = transient ? DateTime.now() : null; });
     if (transient)
       clearCursor = Timer(const Duration(milliseconds: 450), () {
         if (mounted) setState(() => cursor = null);
@@ -75,6 +76,8 @@ class _TerminalSurfaceState extends State<TerminalSurface>
                       chromatic: widget.store.chromatic,
                       phase: cycle.value,
                       cursor: cursor,
+                      cursorOpacity: touchedAt == null ? 1 :
+                        (1 - DateTime.now().difference(touchedAt!).inMilliseconds / 450).clamp(0.0,1.0).toDouble(),
                     ),
                   ),
                 ),
@@ -91,6 +94,7 @@ class AnalogPainter extends CustomPainter {
   final bool crt, noise, glitch, chromatic;
   final double phase;
   final Offset? cursor;
+  final double cursorOpacity;
   AnalogPainter({
     this.crt = false,
     this.noise = false,
@@ -98,6 +102,7 @@ class AnalogPainter extends CustomPainter {
     this.chromatic = false,
     this.phase = 0,
     this.cursor,
+    this.cursorOpacity = 1,
   });
   @override
   void paint(Canvas canvas, Size size) {
@@ -157,7 +162,7 @@ class AnalogPainter extends CustomPainter {
     }
     if (cursor != null) {
       final p = Paint()
-        ..color = SamTokens.phosphor.withValues(alpha: .65)
+        ..color = SamTokens.phosphor.withValues(alpha: .65 * cursorOpacity)
         ..strokeWidth = .65
         ..style = PaintingStyle.stroke;
       canvas.drawCircle(cursor!, 3, p);

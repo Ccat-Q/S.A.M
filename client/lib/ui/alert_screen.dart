@@ -43,121 +43,142 @@ class _AlertsScreenState extends State<AlertsScreen> {
           );
     final node = alert == null ? null : store.nodes[alert['node_id']];
     widget.actions?.bind({
-      'LOCATE': alert == null ? null : () => widget.locate(alert['node_id'] as String),
-      'CAMERA': alert == null ? null : () => widget.camera(alert['node_id'] as String),
-      'LINK': alert == null ? null : () => widget.inspect(alert['node_id'] as String),
+      'LOCATE': alert == null
+          ? null
+          : () => widget.locate(alert['node_id'] as String),
+      'CAMERA': alert == null
+          ? null
+          : () => widget.camera(alert['node_id'] as String),
+      'LINK': alert == null
+          ? null
+          : () => widget.inspect(alert['node_id'] as String),
       'ACK': alert?['state'] == 'ACTIVE' && store.canControl && store.connected
-        ? () => report(context, () => store.acknowledge(alert!['id'] as String)) : null,
-      'LOG': alert == null ? null : () => widget.logs(alert['node_id'] as String),
+          ? () =>
+                report(context, () => store.acknowledge(alert!['id'] as String))
+          : null,
+      'LOG': alert == null
+          ? null
+          : () => widget.logs(alert['node_id'] as String),
       'HISTORY': () => setState(() => history = !history),
     });
-    return Stack(children: [
-      Positioned.fill(child: IgnorePointer(child: CustomPaint(painter: _WatchAxis(store: store)))),
-      Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Stack(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 20, 8, 8),
-          child: Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'SYSTEM / ANOMALY ANALYSIS',
-                  style: TextStyle(
-                    fontFamily: 'RobotoCondensed',
-                    fontSize: 15,
-                    letterSpacing: 2,
-                  ),
-                ),
-              ),
-              SoftKey(
-                label: history ? 'ACTIVE' : 'HISTORY',
-                onPressed: () => setState(() => history = !history),
-              ),
-            ],
+        Positioned.fill(
+          child: IgnorePointer(
+            child: CustomPaint(painter: _WatchAxis(store: store)),
           ),
         ),
-        if (alert == null)
-          Expanded(child: _Standby(store: store))
-        else
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 20, 8, 8),
+              child: Row(
                 children: [
-                  Wrap(
-                    children: [
-                      for (var i = 0; i < alerts.length; i++)
-                        SoftKey(
-                          key: ValueKey('alert-${alerts[i]['id']}'),
-                          code: (i + 1).toString().padLeft(2, '0'),
-                          label: alerts[i]['severity'] as String,
-                          selected: alerts[i]['id'] == alert['id'],
-                          color: statusColor(alerts[i]['severity'] as String),
-                          onPressed: () => setState(
-                            () => selected = alerts[i]['id'] as String,
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 30),
-                  Text(
-                    'SYS ALERT / ${(alerts.indexOf(alert) + 1).toString().padLeft(2, '0')}',
-                    style: const TextStyle(
-                      color: muted,
-                      fontSize: 10,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    (alert['condition'] as String).replaceAll('_', ' '),
-                    style: TextStyle(
-                      fontFamily: 'RobotoCondensed',
-                      fontSize: 28,
-                      letterSpacing: 2,
-                      color: statusColor(alert['severity'] as String),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    '${node?.module ?? 'UNKNOWN'} / ${alert['node_id']}',
-                    style: const TextStyle(fontSize: 13, letterSpacing: 1.5),
-                  ),
-                  const SizedBox(height: 40),
-                  SizedBox(
-                    height: 180,
-                    width: double.infinity,
-                    child: CustomPaint(
-                      painter: _FaultPath(
-                        store: store,
-                        nodeId: alert['node_id'] as String,
+                  const Expanded(
+                    child: Text(
+                      'SYSTEM / ANOMALY ANALYSIS',
+                      style: TextStyle(
+                        fontFamily: 'RobotoCondensed',
+                        fontSize: 15,
+                        letterSpacing: 2,
                       ),
                     ),
                   ),
-                  Reading('STATE', alert['state'] as String),
-                  Reading(
-                    'OPERATOR',
-                    alert['acknowledged_by'] as String? ?? 'UNASSIGNED',
+                  SoftKey(
+                    label: history ? 'ACTIVE' : 'HISTORY',
+                    onPressed: () => setState(() => history = !history),
                   ),
-                  Text(
-                    alert['created_at'] as String,
-                    style: const TextStyle(color: muted, fontSize: 8),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'ACK ≠ RESOLVE / CONDITION-DRIVEN RECOVERY',
-                    style: TextStyle(color: muted, fontSize: 8),
-                  ),
-                  const Divider(height: 28),
-
                 ],
               ),
             ),
-          ),
+            if (alert == null)
+              Expanded(child: _Standby(store: store))
+            else
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        children: [
+                          for (var i = 0; i < alerts.length; i++)
+                            SoftKey(
+                              key: ValueKey('alert-${alerts[i]['id']}'),
+                              code: (i + 1).toString().padLeft(2, '0'),
+                              label: alerts[i]['severity'] as String,
+                              selected: alerts[i]['id'] == alert['id'],
+                              color: statusColor(
+                                alerts[i]['severity'] as String,
+                              ),
+                              onPressed: () => setState(
+                                () => selected = alerts[i]['id'] as String,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 30),
+                      Text(
+                        'SYS ALERT / ${(alerts.indexOf(alert) + 1).toString().padLeft(2, '0')}',
+                        style: const TextStyle(
+                          color: muted,
+                          fontSize: 10,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        (alert['condition'] as String).replaceAll('_', ' '),
+                        style: TextStyle(
+                          fontFamily: 'RobotoCondensed',
+                          fontSize: 28,
+                          letterSpacing: 2,
+                          color: statusColor(alert['severity'] as String),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        '${node?.module ?? 'UNKNOWN'} / ${alert['node_id']}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+                      SizedBox(
+                        height: 180,
+                        width: double.infinity,
+                        child: CustomPaint(
+                          painter: _FaultPath(
+                            store: store,
+                            nodeId: alert['node_id'] as String,
+                          ),
+                        ),
+                      ),
+                      Reading('STATE', alert['state'] as String),
+                      Reading(
+                        'OPERATOR',
+                        alert['acknowledged_by'] as String? ?? 'UNASSIGNED',
+                      ),
+                      Text(
+                        alert['created_at'] as String,
+                        style: const TextStyle(color: muted, fontSize: 8),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'ACK ≠ RESOLVE / CONDITION-DRIVEN RECOVERY',
+                        style: TextStyle(color: muted, fontSize: 8),
+                      ),
+                      const Divider(height: 28),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
       ],
-    )]);
+    );
   }
 }
 
@@ -165,20 +186,76 @@ class _Standby extends StatelessWidget {
   final SystemStore store;
   const _Standby({required this.store});
   @override
-  Widget build(BuildContext context) => LayoutBuilder(builder: (_, box) => Stack(children: [
-    Positioned(left: 18, top: 10, child: Text('ALERT CHANNEL\nSTATUS / ${store.connected ? 'ARMED' : 'STALE'}\nSYS.ALERT.00 / WATCH ${store.paused ? 'HOLD' : 'ACTIVE'}',
-      style: const TextStyle(fontSize: 9, color: muted, height: 2, letterSpacing: 1))),
-    Positioned(left: 35, top: box.maxHeight * .27, child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('00', style: TextStyle(fontFamily: 'RobotoCondensed', fontSize: 72, color: ink, fontWeight: FontWeight.w200)),
-      Text('ACTIVE ALERTS', style: TextStyle(fontSize: 9, letterSpacing: 2, color: muted)),
-    ])),
-    Positioned(right: 24, top: box.maxHeight * .37, child: const Text('CRITICAL 000\nWARNING  000\nADVISORY 000',
-      style: TextStyle(fontSize: 9, height: 2.2, color: muted))),
-    Positioned(left: 18, bottom: 62, child: Text('MONITORING / ${store.nodes.length} NODES\n\nWATCH CHANNELS\nPWR BUS / ENVIRONMENT\nNETWORK / CAM ARRAY / SECURITY',
-      style: const TextStyle(fontSize: 8, height: 2, letterSpacing: 1, color: muted))),
-    const Positioned(left: 18, bottom: 14, child: Text('SYS > ALERT CHANNEL / STANDBY\nNO CURRENT EXCEPTIONS',
-      style: TextStyle(fontSize: 9, color: accent, height: 1.8))),
-  ]));
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (_, box) => Stack(
+      children: [
+        Positioned(
+          left: 18,
+          top: 10,
+          child: Text(
+            'ALERT CHANNEL\nSTATUS / ${store.connected ? 'ARMED' : 'STALE'}\nSYS.ALERT.00 / WATCH ${store.paused ? 'HOLD' : 'ACTIVE'}',
+            style: const TextStyle(
+              fontSize: 9,
+              color: muted,
+              height: 2,
+              letterSpacing: 1,
+            ),
+          ),
+        ),
+        Positioned(
+          left: 35,
+          top: box.maxHeight * .27,
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '00',
+                style: TextStyle(
+                  fontFamily: 'RobotoCondensed',
+                  fontSize: 72,
+                  color: ink,
+                  fontWeight: FontWeight.w200,
+                ),
+              ),
+              Text(
+                'ACTIVE ALERTS',
+                style: TextStyle(fontSize: 9, letterSpacing: 2, color: muted),
+              ),
+            ],
+          ),
+        ),
+        Positioned(
+          right: 24,
+          top: box.maxHeight * .37,
+          child: const Text(
+            'CRITICAL 000\nWARNING  000\nADVISORY 000',
+            style: TextStyle(fontSize: 9, height: 2.2, color: muted),
+          ),
+        ),
+        Positioned(
+          left: 18,
+          bottom: 62,
+          child: Text(
+            'MONITORING / ${store.nodes.length} NODES\n\nWATCH CHANNELS\nPWR BUS / ENVIRONMENT\nNETWORK / CAM ARRAY / SECURITY',
+            style: const TextStyle(
+              fontSize: 8,
+              height: 2,
+              letterSpacing: 1,
+              color: muted,
+            ),
+          ),
+        ),
+        const Positioned(
+          left: 18,
+          bottom: 14,
+          child: Text(
+            'SYS > ALERT CHANNEL / STANDBY\nNO CURRENT EXCEPTIONS',
+            style: TextStyle(fontSize: 9, color: accent, height: 1.8),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _WatchAxis extends CustomPainter {
@@ -186,21 +263,34 @@ class _WatchAxis extends CustomPainter {
   _WatchAxis({required this.store});
   @override
   void paint(Canvas canvas, Size size) {
-    final pen = Paint()..color = accent.withValues(alpha: .09)..strokeWidth = .6;
+    final pen = Paint()
+      ..color = accent.withValues(alpha: .09)
+      ..strokeWidth = .6;
     final x = size.width * .61;
     canvas.drawLine(Offset(x, 32), Offset(x, size.height - 30), pen);
     for (double y = 46; y < size.height - 30; y += 22) {
-      canvas.drawLine(Offset(x-4, y), Offset(x+8, y), pen);
+      canvas.drawLine(Offset(x - 4, y), Offset(x + 8, y), pen);
     }
     for (var i = 0; i < 4; i++) {
-      final y = 80 + (size.height-190) * i / 4;
-      canvas.drawLine(Offset(x, y), Offset(size.width-18, y), pen);
-      drawLabel(canvas, 'MOD-0${i+1}', Offset(x+12, y+5), accent.withValues(alpha: .13), size: 8);
+      final y = 80 + (size.height - 190) * i / 4;
+      canvas.drawLine(Offset(x, y), Offset(size.width - 18, y), pen);
+      drawLabel(
+        canvas,
+        'MOD-0${i + 1}',
+        Offset(x + 12, y + 5),
+        accent.withValues(alpha: .13),
+        size: 8,
+      );
     }
     for (var i = 0; i < store.displayEvents.length; i++) {
-      canvas.drawCircle(Offset(x, size.height*.2 + i*38), 2, Paint()..color = accent.withValues(alpha: .16));
+      canvas.drawCircle(
+        Offset(x, size.height * .2 + i * 38),
+        2,
+        Paint()..color = accent.withValues(alpha: .16),
+      );
     }
   }
+
   @override
   bool shouldRepaint(covariant _WatchAxis oldDelegate) => true;
 }

@@ -215,7 +215,8 @@ class SystemStore extends ChangeNotifier {
         if (eventGeneration > generation) displayEvents.clear();
         if (eventGeneration >= generation &&
             !displayEvents.any((e) => e['cursor'] == eventCursor) &&
-            (event['category'] != 'TELEMETRY' || (data['tick'] as int? ?? 0) % 3 == 0)) {
+            (event['category'] != 'TELEMETRY' ||
+                (data['tick'] as int? ?? 0) % 3 == 0)) {
           displayEvents.insert(0, event);
           if (displayEvents.length > 4) displayEvents.removeLast();
         }

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../state/system_store.dart';
 import 'instruments.dart';
@@ -140,9 +141,9 @@ class OverviewScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Divider(),
-                const Text(
-                  'EVENT STREAM / LIVE',
-                  style: TextStyle(
+                  Text(
+                    'EVENT STREAM / ${!store.connected ? 'STALE' : store.paused ? 'HOLD' : 'LIVE'}',
+                    style: const TextStyle(
                     color: muted,
                     fontSize: 8,
                     letterSpacing: 1.5,
@@ -267,14 +268,16 @@ class _MapScreenState extends State<MapScreen> {
                     child: GestureDetector(
                       onTapUp: (e) {
                         if (interior != null) {
+                          String? nearest;
+                          var best = math.max(80.0, 22 / transform.value.getMaxScaleOnAxis());
                           for (final n in members) {
-                            if ((e.localPosition - interiorPosition(n))
-                                    .distance <
-                                80) {
-                              widget.inspect(n.id);
-                              break;
+                            final distance = (e.localPosition - interiorPosition(n)).distance;
+                            if (distance < best) {
+                              nearest = n.id;
+                              best = distance;
                             }
                           }
+                          if (nearest != null) widget.inspect(nearest);
                         } else {
                           for (final entry in moduleCenters.entries) {
                             if ((e.localPosition - entry.value).distance <
@@ -498,6 +501,7 @@ class _NetworkScreenState extends State<NetworkScreen> {
   final transform = TransformationController();
   String search = '', filter = 'ALL';
   bool initialized = false;
+  bool traced = false;
   @override
   void dispose() {
     transform.dispose();
@@ -512,10 +516,10 @@ class _NetworkScreenState extends State<NetworkScreen> {
         final id = await terminalSelect(context, 'NET NODE SELECT', store.nodes.keys);
         if (id != null && mounted) store.selectNode(id);
       },
-      'TRACE': () { setState(() { search = store.selectedId ?? ''; filter = 'ALL'; }); },
+      'TRACE': store.selectedId == null ? null : () => setState(() => traced = !traced),
       'FILTER': () async {
         final type = await terminalSelect(context, 'NODE TYPE', ['ALL','CAMERA','DEVICE','SENSOR','SERVER','NETWORK','ROBOT','MODULE']);
-        if (type != null && mounted) setState(() => filter = type);
+        if (type != null && mounted) setState(() { filter = type; traced = false; });
       },
       'INSPECT': store.selectedId == null ? null : () => widget.inspect(store.selectedId!),
     });
@@ -529,6 +533,12 @@ class _NetworkScreenState extends State<NetworkScreen> {
         )
         .map((n) => n.id)
         .toSet();
+    final traceNodes = <String>{if (store.selectedId != null) store.selectedId!,
+      for (final edge in store.edges) ...[
+        if (edge['source'] == store.selectedId) edge['target'] as String,
+        if (edge['target'] == store.selectedId) edge['source'] as String,
+      ],
+    };
     return Column(
       children: [
         Padding(
@@ -546,7 +556,7 @@ class _NetworkScreenState extends State<NetworkScreen> {
                 child: TextField(
                   key: const Key('node-search'),
                   decoration: const InputDecoration(labelText: 'NODE QUERY'),
-                  onChanged: (s) => setState(() => search = s),
+                  onChanged: (s) => setState(() { search = s; traced = false; }),
                 ),
               ),
               DropdownButton<String>(
@@ -572,7 +582,7 @@ class _NetworkScreenState extends State<NetworkScreen> {
                           ),
                         )
                         .toList(),
-                onChanged: (s) => setState(() => filter = s!),
+                onChanged: (s) => setState(() { filter = s!; traced = false; }),
               ),
             ],
           ),
@@ -596,7 +606,7 @@ class _NetworkScreenState extends State<NetworkScreen> {
                 network: true,
                 onSelect: widget.inspect,
                 controller: transform,
-                visible: filter == 'ALL' && search.isEmpty ? null : matches,
+                visible: traced ? traceNodes : filter == 'ALL' && search.isEmpty ? null : matches,
               );
             },
           ),
@@ -604,7 +614,7 @@ class _NetworkScreenState extends State<NetworkScreen> {
         Padding(
           padding: const EdgeInsets.all(12),
           child: Text(
-            'CYAN / DATA    AMBER / POWER    RED / FAULT\n${store.selectedId ?? 'NODE SELECT / STANDBY'}',
+            'CYAN / DATA    AMBER / POWER    RED / FAULT\n${traced ? 'TRACE / DIRECT DEPENDENCIES / ' : ''}${store.selectedId ?? 'NODE SELECT / STANDBY'}',
             style: const TextStyle(color: muted, fontSize: 9, height: 1.8),
           ),
         ),

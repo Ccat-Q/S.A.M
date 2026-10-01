@@ -17,14 +17,14 @@ client = root / "client"
 diagnostic = root / "artifacts/simulator-startup.log"
 
 
-def simctl(*args, **kwargs):
-    return subprocess.run(["xcrun", "simctl", *args], timeout=20, **kwargs)
+def simctl(*args, timeout=20, **kwargs):
+    return subprocess.run(["xcrun", "simctl", *args], timeout=timeout, **kwargs)
 
 
 try:
-    simctl("install", device, str(client / "build/ios/iphonesimulator/Runner.app"), check=True)
+    simctl("install", device, str(client / "build/ios/iphonesimulator/Runner.app"), timeout=45, check=True)
     simctl("launch", device, bundle, "--start-paused", "--enable-checked-mode",
-           "--verify-entry-points", "--disable-vm-service-publication", check=True)
+           "--verify-entry-points", "--disable-vm-service-publication", timeout=60, check=True)
     deadline = time.monotonic() + 45
     uri = None
     while time.monotonic() < deadline:
@@ -49,4 +49,7 @@ try:
     ], cwd=client)
     sys.exit(result.returncode)
 finally:
-    simctl("terminate", device, bundle, check=False)
+    try:
+        simctl("terminate", device, bundle, timeout=10, check=False)
+    except (subprocess.TimeoutExpired, OSError) as error:
+        print(f"Simulator cleanup could not complete: {error}", file=sys.stderr)

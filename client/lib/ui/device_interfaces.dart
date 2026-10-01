@@ -66,13 +66,17 @@ class DeviceInterface extends StatelessWidget {
           Reading('POWER RESERVE', '${n.telemetry['power']} %', color: color),
           Reading(
             'OUTPUT',
-            n.status == 'OFFLINE' || n.fault == 'OUTPUT_FAILURE' ? 'INHIBITED' : 'ACTIVE',
+            n.status == 'OFFLINE' || n.fault == 'OUTPUT_FAILURE'
+                ? 'INHIBITED'
+                : 'ACTIVE',
             color: color,
           ),
           Reading(
             'BREAKER',
             n.controls['power'] == true
-                ? n.fault == null ? 'CLOSED / BUS ACTIVE' : 'CLOSED / OUTPUT FAULT'
+                ? n.fault == null
+                      ? 'CLOSED / BUS ACTIVE'
+                      : 'CLOSED / OUTPUT FAULT'
                 : 'OPEN / ISOLATED',
             color: color,
           ),

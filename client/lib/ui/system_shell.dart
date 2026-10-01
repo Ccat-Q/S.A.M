@@ -22,7 +22,7 @@ class _SystemShellState extends State<SystemShell> {
   int page = 0;
   String? logNode;
   bool fullscreen = false;
-  final entered = DateTime.now();
+  final uptimeClock = Stopwatch()..start();
   Timer? clock;
   static const names = [
     'SYSTEM',
@@ -229,8 +229,7 @@ class _SystemShellState extends State<SystemShell> {
       8 => ['OPEN','RELATE','FILTER','TRACE','RETURN'],
       _ => ['DETAIL','LOG','RELOC','SETTINGS','RETURN'],
     };
-    final uptime = DateTime.now()
-        .difference(entered)
+    final uptime = uptimeClock.elapsed
         .toString()
         .split('.')
         .first

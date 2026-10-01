@@ -10,10 +10,16 @@ class CameraScreen extends StatefulWidget {
   final SystemStore store;
   final ValueChanged<String> inspect;
   final TerminalActions? actions;
-  const CameraScreen({super.key, required this.store, required this.inspect, this.actions});
+  const CameraScreen({
+    super.key,
+    required this.store,
+    required this.inspect,
+    this.actions,
+  });
   @override
   State<CameraScreen> createState() => _CameraScreenState();
 }
+
 class _CameraScreenState extends State<CameraScreen> {
   String? lockedTarget, lockedCamera;
   @override
@@ -24,26 +30,46 @@ class _CameraScreenState extends State<CameraScreen> {
     if (all.isEmpty)
       return const Center(child: Text('OPTICAL CHANNEL / UNAVAILABLE'));
     final camera = store.nodes[store.cameraId] ?? all.first;
-    if (lockedCamera != camera.id) { lockedTarget = null; lockedCamera = null; }
+    if (lockedCamera != camera.id) {
+      lockedTarget = null;
+      lockedCamera = null;
+    }
     final angles = all.where((n) => n.module == camera.module).toList();
     final ids = (store.cameraTargets[camera.id] as List? ?? [])
         .map((x) => x['node_id'])
         .toSet();
     final aimed = ids.contains(store.selectedId) && camera.status != 'OFFLINE';
-    final locked = lockedTarget == store.selectedId && lockedCamera == camera.id && aimed;
+    final locked =
+        lockedTarget == store.selectedId && lockedCamera == camera.id && aimed;
     widget.actions?.bind({
-      'ANGLE': () => store.setCamera(angles[(angles.indexOf(camera) + 1) % angles.length].id),
-      'SCAN': aimed && store.connected ? () => report(context, () async {
-        await store.scan();
-        if (context.mounted) inspect(store.selectedId!);
-      }) : null,
-      'LINK': (aimed && store.scannedId == store.selectedId) ||
-        (store.selected?.fault != null && store.selected?.module == camera.module)
-        ? () => inspect(store.selectedId!) : null,
-      'TRACK': aimed ? () {
-        setState(() { lockedTarget = locked ? null : store.selectedId; lockedCamera = camera.id; });
-        SystemMessages.shared.emit(locked ? 'TARGET RELEASED' : 'TARGET LOCK / ${store.selectedId} / MANUAL');
-      } : null,
+      'ANGLE': () => store.setCamera(
+        angles[(angles.indexOf(camera) + 1) % angles.length].id,
+      ),
+      'SCAN': aimed && store.connected
+          ? () => report(context, () async {
+              await store.scan();
+              if (context.mounted) inspect(store.selectedId!);
+            })
+          : null,
+      'LINK':
+          (aimed && store.scannedId == store.selectedId) ||
+              (store.selected?.fault != null &&
+                  store.selected?.module == camera.module)
+          ? () => inspect(store.selectedId!)
+          : null,
+      'TRACK': aimed
+          ? () {
+              setState(() {
+                lockedTarget = locked ? null : store.selectedId;
+                lockedCamera = camera.id;
+              });
+              SystemMessages.shared.emit(
+                locked
+                    ? 'TARGET RELEASED'
+                    : 'TARGET LOCK / ${store.selectedId} / MANUAL',
+              );
+            }
+          : null,
     });
     return Column(
       children: [
@@ -129,7 +155,9 @@ class _CameraScreenState extends State<CameraScreen> {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              locked ? 'TARGET LOCK / $lockedTarget / MANUAL OPTICAL FIX' : !aimed
+              locked
+                  ? 'TARGET LOCK / $lockedTarget / MANUAL OPTICAL FIX'
+                  : !aimed
                   ? 'OBJECTIVE / ACQUIRE DEVICE TARGET'
                   : store.scannedId == store.selectedId
                   ? 'IDENTIFIED / ${store.selected?.subtype} / ${store.selectedId}'
@@ -142,7 +170,6 @@ class _CameraScreenState extends State<CameraScreen> {
             ),
           ),
         ),
-
       ],
     );
   }

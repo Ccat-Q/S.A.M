@@ -326,7 +326,9 @@ class StationPainter extends CustomPainter {
     )) {
       final p = interiorPosition(n);
       final color = store.selectedId == n.id ? ink : statusColor(n.status);
-      canvas.drawCircle(p, 6, Paint()..color = color);
+      final alpha = n.type == 'SENSOR' && n.status == 'ONLINE'
+        ? .82 + .1 * math.sin((motion?.value ?? 0) * math.pi * 8) : 1.0;
+      canvas.drawCircle(p, 6, Paint()..color = color.withValues(alpha: alpha));
       canvas.drawLine(
         p,
         p + const Offset(50, -22),
