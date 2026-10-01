@@ -20,6 +20,9 @@ dev_dependencies:
     sdk: flutter
 flutter:
   uses-material-design: true
+  assets:
+    - assets/fonts/RobotoMono-OFL.txt
+    - assets/fonts/RobotoCondensed-OFL.txt
   fonts:
     - family: RobotoMono
       fonts:
