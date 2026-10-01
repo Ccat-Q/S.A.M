@@ -47,7 +47,7 @@ class _TerminalSurfaceState extends State<TerminalSurface>
     clearCursor?.cancel();
     setState(() => cursor = p);
     if (transient)
-      clearCursor = Timer(const Duration(milliseconds: 700), () {
+      clearCursor = Timer(const Duration(milliseconds: 450), () {
         if (mounted) setState(() => cursor = null);
       });
   }
@@ -157,23 +157,39 @@ class AnalogPainter extends CustomPainter {
     }
     if (cursor != null) {
       final p = Paint()
-        ..color = ink.withValues(alpha: .75)
+        ..color = SamTokens.phosphor.withValues(alpha: .65)
         ..strokeWidth = .65
         ..style = PaintingStyle.stroke;
-      canvas.drawCircle(cursor!, 6, p);
+      canvas.drawCircle(cursor!, 3, p);
       for (final d in [
         const Offset(1, 0),
         const Offset(-1, 0),
         const Offset(0, 1),
         const Offset(0, -1),
       ]) {
-        canvas.drawLine(cursor! + d * 9, cursor! + d * 17, p);
+        canvas.drawLine(cursor! + d * 5, cursor! + d * 9, p);
       }
     }
   }
 
   @override
   bool shouldRepaint(covariant AnalogPainter oldDelegate) => true;
+}
+
+class DisplayLayer extends StatelessWidget {
+  final Widget child;
+  final int delay;
+  const DisplayLayer({super.key, required this.child, this.delay = 0});
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+    tween: Tween(begin: MediaQuery.disableAnimationsOf(context) ? 1.0 : 0.0, end: 1.0),
+    duration: const Duration(milliseconds: 380),
+    builder: (_, progress, child) {
+      final start = delay / 380;
+      final reveal = ((progress - start) / (1 - start)).clamp(0.0, 1.0);
+      return ClipRect(clipper: _DisplayClip(reveal), child: child);
+    }, child: child,
+  );
 }
 
 class DisplayRedraw extends StatelessWidget {

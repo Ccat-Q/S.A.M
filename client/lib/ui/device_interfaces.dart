@@ -55,7 +55,7 @@ class DeviceInterface extends StatelessWidget {
             painter: DeviceSchematic(
               type: n.subtype,
               color: color,
-              powered: n.controls['power'] == true,
+              powered: n.controls['power'] == true && n.status != 'OFFLINE',
               open: n.controls['door'] == 'open',
               level: (n.controls['brightness'] as num? ?? 0).toDouble(),
             ),
@@ -66,13 +66,13 @@ class DeviceInterface extends StatelessWidget {
           Reading('POWER RESERVE', '${n.telemetry['power']} %', color: color),
           Reading(
             'OUTPUT',
-            n.status == 'OFFLINE' ? 'INHIBITED' : 'ACTIVE',
+            n.status == 'OFFLINE' || n.fault == 'OUTPUT_FAILURE' ? 'INHIBITED' : 'ACTIVE',
             color: color,
           ),
           Reading(
             'BREAKER',
             n.controls['power'] == true
-                ? 'CLOSED / BUS ACTIVE'
+                ? n.fault == null ? 'CLOSED / BUS ACTIVE' : 'CLOSED / OUTPUT FAULT'
                 : 'OPEN / ISOLATED',
             color: color,
           ),

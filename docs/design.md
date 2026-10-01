@@ -26,7 +26,7 @@
 
 系统代码为英文，中文辅助解释；状态保留 ONLINE / OFFLINE / ESTABLISHED / NOMINAL / FAULT。标题通常 13–18 逻辑像素，辅助读数 8–12；细小视觉不缩小触控命中区域，交互至少 44 逻辑像素。
 
-顶栏为小型 `SAM.OS / REV`、系统时码、状态与文字 Tab；底部统一为 `01 SYS / 02 RELOC / 03 CAM / 04 ALERT / 05 CORE` Soft Key Strip。没有大图标、胶囊高亮、Material Navigation 或圆角 Bottom Sheet。CORE 索引提供设备、Network、Memory、日志、设置入口。平板沿用终端语言，控制覆盖层靠右；手机控制覆盖层靠下，可滚动。
+顶栏为小型 `SAM.OS / REV`、持续递增的实际会话 uptime、状态及 `SYSTEM / RELOC / NETWORK / ALERT / MEMORY` 一级模块 Tab。底部只承载当前页面的操作，不重复导航：SYSTEM 为 DETAIL / LOG / DIAG / RELOC / COMMAND，RELOC 为 SELECT / CAMERA / TRACE / FILTER / RETURN，CAMERA 为 ANGLE / SCAN / LINK / TRACK / EXIT，ALERT 为 LOCATE / CAMERA / LINK / ACK / HISTORY（存在异常时最后一键为 LOG），MEMORY 为 OPEN / RELATE / FILTER / TRACE / RETURN。COMMAND 索引保留设备、日志、设置等既有入口。没有大图标、胶囊高亮、Material Navigation 或圆角 Bottom Sheet。平板沿用终端语言，控制覆盖层靠右；手机控制覆盖层靠下，可滚动。
 
 ## 感知与连接链
 
@@ -52,4 +52,16 @@ Memory Ring 是现有数据的只读关系投影：事件取自服务端保留�
 
 全局轻 scanline、vignette、磷光波动、低强度 grain；Camera 可叠加轻色差与滚动扰动。CRT / VIDEO NOISE / CHROMATIC / GLITCH 均可在设置关闭，CRT 与轻噪声默认开启，扰动和色差默认关闭。减少动态效果时停止装饰周期。
 
-桌面 precise cursor 与手机短暂 touch reticle 不拦截输入。页面以 280ms 线性扫描重绘而非 App 滑动转场；摄像头 HUD 不被大 Panel 遮挡。实际数据和控制不等待装饰动画；首次 Pair 的三步输入可快速完成，后续提供 Quick Pair。
+桌面 precise cursor 与手机短暂 touch reticle 不拦截输入；手机准星为淡磷光细线，触摸后 450ms 消失。页面以 280ms 线性扫描重绘而非 App 滑动转场；Overview 图层以 20/40/70/110ms 起始偏移，在 380ms 内完成绘制。摄像头 HUD 不被大 Panel 遮挡。实际数据和控制不等待装饰动画；首次 Pair 的三步输入可快速完成，后续提供 Quick Pair。
+
+## 运行感修订
+
+保留现有线框与黑场。新增 airlock、utility arm、relay、service tunnel、外部供电结构作为原创设施几何，不能冒充新增的在线 Node。站体低幅中心脉冲、线路移动光点、摄像机位置亮度变化由独立绘制层驱动；暂停模拟时停下线路移动。遵循系统减少动态效果设置。
+
+Overview 额外显示真实 SEN-01 温度、NET-01 上行状态与 Sensor 集合状态，不编造 LOAD、O₂ 或模型运行状态。SYS.AI / WATCH MODE 表示 Mock 监测模式，不表示已接入模型。
+
+Event Stream 是最多四条的客户端实时队列，来源为服务端 WebSocket 事件；每三个遥测 tick 呈现一帧，其他实际事件立即进入。界面显示最近三条及真实时间，旧条目通过短距离滚动、透明度衰减退出。重置、登出清空队列，重复 cursor 去重；持久审计和日志仍由原服务提供。暂停/断线不会继续制造正常遥测事件。
+
+Alert 无异常时显示 ARMED / STALE、00 ACTIVE ALERTS、监测节点数和 Watch Channels，背景为极淡事件轴、刻度和模块参考线；有异常时替换为故障源及依赖分析。ACK 仍不等于恢复。
+
+Camera 老旧 CCTV 效果仅作用于光学画面：轻度去饱和、场扫描线、曝光缓慢波动、低对比 field ghost 与压缩颗粒。HUD 文字不做字符替换或失真。TRACK 是当前目标的手动锁定/释放，阻止误选；没有自动目标检测、实体追踪或虚构运动轨迹。

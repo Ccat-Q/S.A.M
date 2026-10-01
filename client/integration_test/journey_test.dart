@@ -21,6 +21,8 @@ Future<void> waitFor(WidgetTester tester, Finder finder) async {
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  // Paint the continuously running displays between explicit test operations.
+  binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
   testWidgets(
     'live service: alert → locate → camera → scan → link → recover → audit',
     (tester) async {
@@ -36,28 +38,32 @@ void main() {
         'Testing-Only-1234',
       );
       await tester.tap(find.byKey(const Key('login')));
-      await waitFor(tester, find.byKey(const Key('nav-3')));
+      await waitFor(tester, find.byKey(const Key('tab-3')));
       for (var i = 0; i < 100 && !store.connected; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
       expect(store.connected, isTrue);
+      await tester.pump(const Duration(milliseconds: 500));
       await binding.takeScreenshot('01-overview');
+      await tester.tap(find.byKey(const Key('tab-3')));
+      await waitFor(tester, find.text('ACTIVE ALERTS'));
+      await binding.takeScreenshot('01a-alert-standby');
       await store.simulate('scenario');
-      await tester.tap(find.byKey(const Key('nav-3')));
-      await waitFor(tester, find.byKey(const ValueKey('locate-DEV-01')));
+      await tester.tap(find.byKey(const Key('tab-3')));
+      await waitFor(tester, find.byKey(const Key('soft-LOCATE')));
       await binding.takeScreenshot('02-alerts');
-      await tester.ensureVisible(find.byKey(const ValueKey('locate-DEV-01')));
-      await tester.tap(find.byKey(const ValueKey('locate-DEV-01')));
+      await tester.ensureVisible(find.byKey(const Key('soft-LOCATE')));
+      await tester.tap(find.byKey(const Key('soft-LOCATE')));
       await waitFor(tester, find.byKey(const Key('relocate-camera')));
       expect(store.selectedId, 'DEV-01');
       await binding.takeScreenshot('03-facility-map');
       // Select the other camera in this module; the power outage affects both.
       // Camera still provides explicit no-signal telemetry, without fake vision.
-      await tester.tap(find.byKey(const Key('relocate-camera')));
+      await tester.tap(find.byKey(const Key('soft-CAMERA')));
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.textContaining('NO SIGNAL'), findsWidgets);
       await binding.takeScreenshot('04-camera-offline');
-      await tester.tap(find.byKey(const Key('camera-system-link')));
+      await tester.tap(find.byKey(const Key('soft-LINK')));
       await waitFor(tester, find.byKey(const Key('scan-device')));
       await tester.ensureVisible(find.byKey(const Key('scan-device')));
       await tester.tap(find.byKey(const Key('scan-device')));
@@ -107,13 +113,15 @@ void main() {
       await tester.tap(find.byKey(const Key('close-system-link')));
       store.setCamera('CAM-01');
       await tester.pump(const Duration(milliseconds: 300));
-      await tester.tap(find.byKey(const Key('nav-2')));
+      await tester.tap(find.byKey(const Key('tab-1')));
+      await waitFor(tester, find.byKey(const Key('soft-CAMERA')));
+      await tester.tap(find.byKey(const Key('soft-CAMERA')));
       await waitFor(tester, find.byKey(const ValueKey('target-DEV-02')));
       await binding.takeScreenshot('07-camera-online');
       await tester.tap(find.byKey(const ValueKey('target-DEV-02')));
-      await waitFor(tester, find.byKey(const Key('scan-target')));
+      await waitFor(tester, find.byKey(const Key('soft-SCAN')));
       expect(store.scannedId, isNull);
-      await tester.tap(find.byKey(const Key('scan-target')));
+      await tester.tap(find.byKey(const Key('soft-SCAN')));
       await waitFor(tester, find.byKey(const Key('link-device')));
       expect(store.selectedId, 'DEV-02');
       expect(store.scannedId, 'DEV-02');
@@ -135,9 +143,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.text('MEMORY / SYS.DEV-01'), findsOneWidget);
       await binding.takeScreenshot('09-memory-ring');
-      await tester.tap(find.byKey(const Key('nav-1')));
+      await tester.tap(find.byKey(const Key('tab-1')));
       await tester.pump(const Duration(milliseconds: 400));
-      await tester.tap(find.byKey(const Key('module-systems')));
+      await tester.tap(find.byKey(const Key('soft-TRACE')));
       await tester.pump(const Duration(milliseconds: 400));
       await binding.takeScreenshot('10-module-interior');
       expect(store.linked, isFalse);

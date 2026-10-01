@@ -3,6 +3,7 @@ import '../state/system_store.dart';
 import '../domain/node.dart';
 import 'theme.dart';
 import 'terminal_effects.dart';
+import 'video_texture.dart';
 
 String cameraAsset(Node camera) => int.parse(camera.id.split('-').last) <= 4
     ? 'assets/camera/service-deck.png'
@@ -51,7 +52,9 @@ class CameraDisplay extends StatelessWidget {
                 Positioned.fill(
                   child: Transform(
                     transform: matrix,
-                    child: Image.asset(cameraAsset(camera), fit: BoxFit.fill),
+                    child: ColorFiltered(colorFilter: const ColorFilter.matrix([
+                      .90,.075,.025,0,0, .075,.90,.025,0,0, .075,.15,.775,0,0, 0,0,0,1,0,
+                    ]), child: Image.asset(cameraAsset(camera), fit: BoxFit.fill)),
                   ),
                 ),
               if (camera.status != 'OFFLINE' && store.chromatic)
@@ -80,6 +83,8 @@ class CameraDisplay extends StatelessWidget {
                     ),
                   ),
                 ),
+              if (camera.status != 'OFFLINE' && !thumbnail)
+                Positioned.fill(child: VideoTexture(crt: store.crt, noise: store.noise, glitch: store.glitch)),
               if (camera.status != 'OFFLINE' && !thumbnail)
                 Positioned.fill(
                   child: Transform(

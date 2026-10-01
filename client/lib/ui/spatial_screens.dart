@@ -5,6 +5,9 @@ import 'station.dart';
 import 'map_display.dart';
 import 'camera_display.dart';
 import 'theme.dart';
+import 'terminal_actions.dart';
+import 'terminal_effects.dart';
+import 'event_stream.dart';
 
 class OverviewScreen extends StatelessWidget {
   final SystemStore store;
@@ -27,7 +30,7 @@ class OverviewScreen extends StatelessWidget {
           Positioned(
             left: 18,
             top: 26,
-            child: Column(
+            child: DisplayLayer(delay: 20, child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
@@ -52,25 +55,27 @@ class OverviewScreen extends StatelessWidget {
                   'NET   ${nodes.where((n) => n.status != 'OFFLINE').length.toString().padLeft(3, '0')} / 042',
                   style: const TextStyle(fontSize: 10, color: muted),
                 ),
+                const SizedBox(height: 13),
+                const Text('SYS.AI / WATCH MODE', style: TextStyle(fontSize: 8, color: muted, letterSpacing: 1)),
               ],
-            ),
+            )),
           ),
           Positioned(
-            top: 95,
+            top: 130,
             right: 18,
-            child: Column(
+            child: DisplayLayer(delay: 70, child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  'PWR  ${nodes.isEmpty ? '---' : nodes.first.telemetry['power']}',
+                  'PWR BUS  ${store.nodes['DEV-01']?.telemetry['power'] ?? '---'}',
                   style: const TextStyle(fontSize: 11, color: ink),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 23),
                 Text(
-                  'CAM  ${cameras.where((n) => n.status != 'OFFLINE').length.toString().padLeft(3, '0')} / 008',
+                  'CAM ARRAY / ${cameras.where((n) => n.status != 'OFFLINE').length.toString().padLeft(2, '0')}',
                   style: const TextStyle(color: muted, fontSize: 10),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 9),
                 Text(
                   'ALT  ${faults.length.toString().padLeft(3, '0')}',
                   style: TextStyle(
@@ -79,11 +84,11 @@ class OverviewScreen extends StatelessWidget {
                   ),
                 ),
               ],
-            ),
+            )),
           ),
           Positioned.fill(
-            top: 125,
-            bottom: 135,
+            top: 160,
+            bottom: 155,
             child: GestureDetector(
               onTap: openMap,
               child: FittedBox(
@@ -91,14 +96,14 @@ class OverviewScreen extends StatelessWidget {
                 child: SizedBox(
                   width: stationSize.width,
                   height: stationSize.height,
-                  child: CustomPaint(painter: StationPainter(store: store)),
+                  child: DisplayLayer(delay: 110, child: StationDisplay(store: store)),
                 ),
               ),
             ),
           ),
           Positioned(
             left: 18,
-            bottom: 100,
+            bottom: 128,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -124,7 +129,7 @@ class OverviewScreen extends StatelessWidget {
           ),
           Positioned(
             right: 12,
-            bottom: 105,
+            bottom: 118,
             child: SoftKey(label: 'RELOCATION >', onPressed: openMap),
           ),
           Positioned(
@@ -143,25 +148,16 @@ class OverviewScreen extends StatelessWidget {
                     letterSpacing: 1.5,
                   ),
                 ),
-                for (final event in store.logs.take(2))
-                  Text(
-                    '${event['category']} / ${event['node_id'] ?? 'CORE'} / ${event['message']}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 9,
-                      color: accent,
-                      height: 1.8,
-                    ),
-                  ),
-                if (store.logs.isEmpty)
-                  const Text(
-                    'SYS > MONITOR CHANNEL READY',
-                    style: TextStyle(color: muted, fontSize: 9),
-                  ),
+                EventStream(store: store),
               ],
             ),
           ),
+          Positioned(left: 18, top: box.maxHeight * .46,
+            child: DisplayLayer(delay: 40, child: Text('TEMP / ${store.nodes['SEN-01']?.telemetry['temperature'] ?? '--'} C',
+              style: const TextStyle(fontSize: 8, color: muted)))),
+          Positioned(right: 18, bottom: 203, child: Text(
+            'UPLINK / ${store.nodes['NET-01']?.status ?? 'UNKNOWN'}\nENV / ${nodes.where((n)=>n.type=='SENSOR').any((n)=>n.status!='ONLINE') ? 'EXCEPTION' : 'NOMINAL'}',
+            style: const TextStyle(fontSize: 8, color: muted, height: 2))),
         ],
       ),
     );
@@ -169,6 +165,7 @@ class OverviewScreen extends StatelessWidget {
 }
 
 class MapScreen extends StatefulWidget {
+  final TerminalActions? actions;
   final SystemStore store;
   final ValueChanged<String> inspect, camera;
   const MapScreen({
@@ -176,6 +173,7 @@ class MapScreen extends StatefulWidget {
     required this.store,
     required this.inspect,
     required this.camera,
+    this.actions,
   });
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -185,6 +183,7 @@ class _MapScreenState extends State<MapScreen> {
   final transform = TransformationController();
   String? interior, selectedModule;
   bool initialized = false;
+  bool faultOnly = false;
   @override
   void dispose() {
     transform.dispose();
@@ -225,6 +224,16 @@ class _MapScreenState extends State<MapScreen> {
     final members = store.nodes.values
         .where((n) => n.module == module && n.type != 'MODULE')
         .toList();
+    widget.actions?.bind({
+      'SELECT': () async {
+        final id = await terminalSelect(context, 'MODULE SELECT', moduleCenters.keys);
+        if (id != null && mounted) focus(id);
+      },
+      'CAMERA': cameras.isEmpty ? null : () => widget.camera(
+        store.selected?.module == module ? store.selectedId! : cameras.first.id),
+      'TRACE': module == null ? null : () => setState(() => interior = interior == null ? module : null),
+      'FILTER': () => setState(() => faultOnly = !faultOnly),
+    });
     return LayoutBuilder(
       builder: (context, box) {
         if (!initialized) {
@@ -261,7 +270,7 @@ class _MapScreenState extends State<MapScreen> {
                           for (final n in members) {
                             if ((e.localPosition - interiorPosition(n))
                                     .distance <
-                                65) {
+                                80) {
                               widget.inspect(n.id);
                               break;
                             }
@@ -279,13 +288,8 @@ class _MapScreenState extends State<MapScreen> {
                       child: SizedBox(
                         width: stationSize.width,
                         height: stationSize.height,
-                        child: CustomPaint(
-                          painter: StationPainter(
-                            store: store,
-                            selected: module,
-                            interior: interior,
-                          ),
-                        ),
+                        child: StationDisplay(store: store, selected: module,
+                          interior: interior, faultOnly: faultOnly),
                       ),
                     ),
                   ),
@@ -309,7 +313,7 @@ class _MapScreenState extends State<MapScreen> {
                   const SizedBox(height: 6),
                   Text(
                     interior == null
-                        ? 'STATION STRUCTURE / 04 MODULES'
+                        ? 'NAV.RELOC.01 / ${faultOnly ? 'FAULT CHANNELS' : 'GRID 042.17'}'
                         : '$interior / INTERNAL VOLUME',
                     style: const TextStyle(
                       fontSize: 8,
@@ -482,9 +486,10 @@ class _MapScreenState extends State<MapScreen> {
 }
 
 class NetworkScreen extends StatefulWidget {
+  final TerminalActions? actions;
   final SystemStore store;
   final ValueChanged<String> inspect;
-  const NetworkScreen({super.key, required this.store, required this.inspect});
+  const NetworkScreen({super.key, required this.store, required this.inspect, this.actions});
   @override
   State<NetworkScreen> createState() => _NetworkScreenState();
 }
@@ -502,6 +507,18 @@ class _NetworkScreenState extends State<NetworkScreen> {
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
+    widget.actions?.bind({
+      'SELECT': () async {
+        final id = await terminalSelect(context, 'NET NODE SELECT', store.nodes.keys);
+        if (id != null && mounted) store.selectNode(id);
+      },
+      'TRACE': () { setState(() { search = store.selectedId ?? ''; filter = 'ALL'; }); },
+      'FILTER': () async {
+        final type = await terminalSelect(context, 'NODE TYPE', ['ALL','CAMERA','DEVICE','SENSOR','SERVER','NETWORK','ROBOT','MODULE']);
+        if (type != null && mounted) setState(() => filter = type);
+      },
+      'INSPECT': store.selectedId == null ? null : () => widget.inspect(store.selectedId!),
+    });
     final matches = store.nodes.values
         .where(
           (n) =>
@@ -521,7 +538,7 @@ class _NetworkScreenState extends State<NetworkScreen> {
             runSpacing: 4,
             children: [
               const Text(
-                'NETWORK / DEPENDENCY BUS',
+                'NET.CORE.00 / BUS A',
                 style: TextStyle(fontSize: 11, letterSpacing: 1.5),
               ),
               SizedBox(

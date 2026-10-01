@@ -92,10 +92,9 @@ class _DevicesScreenState extends State<DevicesScreen> {
         '${n.module} / ${n.status} / ${n.telemetry['temperature']} °C',
         style: const TextStyle(color: muted, fontSize: 10),
       ),
-      trailing: IconButton(
-        tooltip: widget.store.tr('Locate node', '定位节点'),
+      trailing: SoftKey(
+        label: 'LOCATE',
         onPressed: () => widget.locate(id),
-        icon: const Icon(Icons.my_location, size: 18),
       ),
     );
   }

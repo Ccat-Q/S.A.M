@@ -8,6 +8,7 @@ import 'memory_core.dart';
 import 'settings.dart';
 import 'terminal_effects.dart';
 import 'theme.dart';
+import 'terminal_actions.dart';
 
 class SystemShell extends StatefulWidget {
   final SystemStore store;
@@ -17,6 +18,7 @@ class SystemShell extends StatefulWidget {
 }
 
 class _SystemShellState extends State<SystemShell> {
+  final actions = TerminalActions();
   int page = 0;
   String? logNode;
   bool fullscreen = false;
@@ -48,7 +50,7 @@ class _SystemShellState extends State<SystemShell> {
   }
 
   void navigate(int next) {
-    setState(() => page = next);
+    setState(() { page = next; if (![1,2,8].contains(next)) fullscreen = false; });
   }
 
   void locate(String id) {
@@ -207,6 +209,26 @@ class _SystemShellState extends State<SystemShell> {
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
+    final target = store.selectedId ?? 'NET-01';
+    actions.reset({
+      'DETAIL': () => inspect(target),
+      'LOG': () => logs(target),
+      'DIAG': () { SystemMessages.shared.emit('DIAGNOSTIC / $target / SYSTEM LINK REQUIRED'); inspect(target); },
+      'RELOC': () => navigate(1),
+      'COMMAND': modules,
+      'RETURN': () => navigate(0),
+      'EXIT': () => navigate(1),
+      'SETTINGS': () => navigate(6),
+    });
+    final softKeys = switch(page) {
+      0 => ['DETAIL','LOG','DIAG','RELOC','COMMAND'],
+      1 => ['SELECT','CAMERA','TRACE','FILTER','RETURN'],
+      2 => ['ANGLE','SCAN','LINK','TRACK','EXIT'],
+      3 => ['LOCATE','CAMERA','LINK','ACK',store.alerts.any((a)=>a['state']!='RESOLVED') ? 'LOG' : 'HISTORY'],
+      7 => ['SELECT','TRACE','FILTER','INSPECT','RETURN'],
+      8 => ['OPEN','RELATE','FILTER','TRACE','RETURN'],
+      _ => ['DETAIL','LOG','RELOC','SETTINGS','RETURN'],
+    };
     final uptime = DateTime.now()
         .difference(entered)
         .toString()
@@ -219,20 +241,21 @@ class _SystemShellState extends State<SystemShell> {
         locate: locate,
         openMap: () => navigate(1),
       ),
-      1 => MapScreen(store: store, inspect: inspect, camera: camera),
-      2 => CameraScreen(store: store, inspect: inspect),
+      1 => MapScreen(store: store, inspect: inspect, camera: camera, actions: actions),
+      2 => CameraScreen(store: store, inspect: inspect, actions: actions),
       3 => AlertsScreen(
         store: store,
         locate: locate,
         camera: camera,
         inspect: inspect,
         logs: logs,
+        actions: actions,
       ),
       4 => DevicesScreen(store: store, inspect: inspect, locate: locate),
       5 => LogsScreen(key: ValueKey(logNode), store: store, nodeId: logNode),
       6 => SettingsScreen(store: store),
-      7 => NetworkScreen(store: store, inspect: inspect),
-      _ => MemoryCoreScreen(store: store, locate: locate),
+      7 => NetworkScreen(store: store, inspect: inspect, actions: actions),
+      _ => MemoryCoreScreen(store: store, locate: locate, actions: actions),
     };
     return Scaffold(
       body: SafeArea(
@@ -331,11 +354,10 @@ class _SystemShellState extends State<SystemShell> {
                     for (var i = 0; i < 5; i++)
                       Expanded(
                         child: SoftKey(
-                          key: ValueKey('nav-$i'),
+                          key: ValueKey('soft-${softKeys[i]}'),
                           code: (i + 1).toString().padLeft(2, '0'),
-                          label: ['SYS', 'RELOC', 'CAM', 'ALERT', 'CORE'][i],
-                          selected: i < 4 ? page == i : page >= 4,
-                          onPressed: i < 4 ? () => navigate(i) : modules,
+                          label: softKeys[i],
+                          onPressed: () => actions.invoke(softKeys[i]),
                         ),
                       ),
                   ],

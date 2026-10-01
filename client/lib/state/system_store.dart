@@ -17,6 +17,9 @@ class SystemStore extends ChangeNotifier {
   Map<String, dynamic>? user;
   Map<String, Node> nodes = {};
   List<Map<String, dynamic>> edges = [], alerts = [], logs = [];
+  // Bounded live display queue. These are received events, never command grants
+  // or substitute audit records; telemetry stays out of the persistent log UI.
+  List<Map<String, dynamic>> displayEvents = [];
   Map<String, dynamic> cameraTargets = {};
   int cursor = 0, generation = 1, tick = 0;
   bool connected = false, busy = false, initialized = false, paused = false;
@@ -136,7 +139,10 @@ class SystemStore extends ChangeNotifier {
     cursor = state['cursor'] as int;
     tick = state['tick'] as int;
     paused = state['paused'] as bool;
-    if (oldGeneration != generation) clearLink();
+    if (oldGeneration != generation) {
+      clearLink();
+      displayEvents.clear();
+    }
   }
 
   Future<void> synchronize() async {
@@ -206,6 +212,13 @@ class SystemStore extends ChangeNotifier {
         final eventCursor = event['cursor'] as int;
         final data = event['data'] as Map;
         final eventGeneration = data['generation'] as int? ?? generation;
+        if (eventGeneration > generation) displayEvents.clear();
+        if (eventGeneration >= generation &&
+            !displayEvents.any((e) => e['cursor'] == eventCursor) &&
+            (event['category'] != 'TELEMETRY' || (data['tick'] as int? ?? 0) % 3 == 0)) {
+          displayEvents.insert(0, event);
+          if (displayEvents.length > 4) displayEvents.removeLast();
+        }
         // An HTTP snapshot may already include these queued stream events.
         // Preserve their logs, but never roll back the snapshot or command state.
         if (eventCursor > cursor && eventGeneration >= generation) {
@@ -467,6 +480,7 @@ class SystemStore extends ChangeNotifier {
     nodes = {};
     alerts = [];
     logs = [];
+    displayEvents = [];
     clearLink();
     if (persist) await vault.delete(key: 'token');
     notifyListeners();
