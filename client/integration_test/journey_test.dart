@@ -43,6 +43,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 100));
       }
       expect(store.connected, isTrue);
+      final initialUptime = tester.widget<Text>(find.byKey(const Key('system-uptime'))).data;
       await tester.pump(const Duration(milliseconds: 500));
       await binding.takeScreenshot('01-overview');
       await tester.tap(find.byKey(const Key('tab-3')));
@@ -148,6 +149,14 @@ void main() {
       await tester.tap(find.byKey(const Key('soft-TRACE')));
       await tester.pump(const Duration(milliseconds: 400));
       await binding.takeScreenshot('10-module-interior');
+      await tester.tap(find.byKey(const Key('tab-0')));
+      for (var i = 0; i < 80 && !store.displayEvents.any((e) => e['category'] == 'TELEMETRY'); i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(store.displayEvents.any((e) => e['category'] == 'TELEMETRY'), isTrue);
+      expect(tester.widget<Text>(find.byKey(const Key('system-uptime'))).data, isNot(initialUptime));
+      await tester.pump(const Duration(milliseconds: 500));
+      await binding.takeScreenshot('11-overview-live');
       expect(store.linked, isFalse);
       await store.suspend();
       expect(store.linked, isFalse);

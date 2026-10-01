@@ -212,7 +212,7 @@ class _SystemShellState extends State<SystemShell> {
     final target = store.selectedId ?? 'NET-01';
     actions.reset({
       'DETAIL': () => inspect(target),
-      'LOG': () => logs(target),
+      'LOG': () { logNode = store.selectedId; navigate(5); },
       'DIAG': () { SystemMessages.shared.emit('DIAGNOSTIC / $target / SYSTEM LINK REQUIRED'); inspect(target); },
       'RELOC': () => navigate(1),
       'COMMAND': modules,
@@ -279,6 +279,7 @@ class _SystemShellState extends State<SystemShell> {
                       const Spacer(),
                       Text(
                         'SYS $uptime',
+                        key: const Key('system-uptime'),
                         style: const TextStyle(fontSize: 8, color: muted),
                       ),
                       const SizedBox(width: 14),

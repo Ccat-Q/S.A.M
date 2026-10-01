@@ -22,25 +22,50 @@ class StationDisplay extends StatefulWidget {
   final SystemStore store;
   final String? selected, interior;
   final bool faultOnly;
-  const StationDisplay({super.key, required this.store, this.selected,
-    this.interior, this.faultOnly = false});
+  const StationDisplay({
+    super.key,
+    required this.store,
+    this.selected,
+    this.interior,
+    this.faultOnly = false,
+  });
   @override
   State<StationDisplay> createState() => _StationDisplayState();
 }
-class _StationDisplayState extends State<StationDisplay> with SingleTickerProviderStateMixin {
-  late final motion = AnimationController(vsync: this, duration: const Duration(seconds: 24));
+
+class _StationDisplayState extends State<StationDisplay>
+    with SingleTickerProviderStateMixin {
+  late final motion = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 24),
+  );
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) motion.stop();
-    else if (!motion.isAnimating) motion.repeat();
+    if (MediaQuery.disableAnimationsOf(context))
+      motion.stop();
+    else if (!motion.isAnimating)
+      motion.repeat();
   }
+
   @override
-  void dispose() { motion.dispose(); super.dispose(); }
+  void dispose() {
+    motion.dispose();
+    super.dispose();
+  }
+
   @override
-  Widget build(BuildContext context) => RepaintBoundary(child: CustomPaint(
-    painter: StationPainter(store: widget.store, selected: widget.selected,
-      interior: widget.interior, faultOnly: widget.faultOnly, motion: motion)));
+  Widget build(BuildContext context) => RepaintBoundary(
+    child: CustomPaint(
+      painter: StationPainter(
+        store: widget.store,
+        selected: widget.selected,
+        interior: widget.interior,
+        faultOnly: widget.faultOnly,
+        motion: motion,
+      ),
+    ),
+  );
 }
 
 void drawLabel(
@@ -70,8 +95,13 @@ class StationPainter extends CustomPainter {
   final String? selected, interior;
   final Animation<double>? motion;
   final bool faultOnly;
-  StationPainter({required this.store, this.selected, this.interior,
-    this.motion, this.faultOnly = false}) : super(repaint: motion);
+  StationPainter({
+    required this.store,
+    this.selected,
+    this.interior,
+    this.motion,
+    this.faultOnly = false,
+  }) : super(repaint: motion);
   @override
   void paint(Canvas canvas, Size size) {
     if (interior != null) {
@@ -113,9 +143,14 @@ class StationPainter extends CustomPainter {
         canvas.drawCircle(collar, 14, pen..color = line);
       }
       if (store.connected && !store.paused && motion != null) {
-        final progress = (phase * 3 + moduleCenters.keys.toList().indexOf(entry.key) * .23) % 1;
-        canvas.drawCircle(Offset.lerp(core, p, progress)!, 2.5,
-          Paint()..color = accent.withValues(alpha: .28));
+        final progress =
+            (phase * 3 + moduleCenters.keys.toList().indexOf(entry.key) * .23) %
+            1;
+        canvas.drawCircle(
+          Offset.lerp(core, p, progress)!,
+          2.5,
+          Paint()..color = accent.withValues(alpha: .28),
+        );
       }
     }
     canvas.drawCircle(core, 67, pen..color = accent.withValues(alpha: .6));
@@ -151,20 +186,54 @@ class StationPainter extends CustomPainter {
     // Fixed facility geometry; these are structural annotations, not invented
     // online devices or telemetry. All actionable nodes retain server IDs.
     final structures = <String, List<Offset>>{
-      'AIRLOCK / DOCK.02': [const Offset(1030, 505), const Offset(1100, 565), const Offset(1120, 635)],
-      'UTILITY ARM': [const Offset(265, 355), const Offset(190, 245), const Offset(290, 175), const Offset(335, 190)],
-      'SERVICE TUNNEL': [const Offset(570, 280), const Offset(390, 285), const Offset(330, 345)],
-      'RELAY / EXT.01': [const Offset(650, 475), const Offset(805, 280), const Offset(950, 260)],
-      'POWER STRUCTURE': [const Offset(230, 465), const Offset(175, 555), const Offset(90, 565)],
+      'AIRLOCK / DOCK.02': [
+        const Offset(1030, 505),
+        const Offset(1100, 565),
+        const Offset(1120, 635),
+      ],
+      'UTILITY ARM': [
+        const Offset(265, 355),
+        const Offset(190, 245),
+        const Offset(290, 175),
+        const Offset(335, 190),
+      ],
+      'SERVICE TUNNEL': [
+        const Offset(570, 280),
+        const Offset(390, 285),
+        const Offset(330, 345),
+      ],
+      'RELAY / EXT.01': [
+        const Offset(650, 475),
+        const Offset(805, 280),
+        const Offset(950, 260),
+      ],
+      'POWER STRUCTURE': [
+        const Offset(230, 465),
+        const Offset(175, 555),
+        const Offset(90, 565),
+      ],
     };
     for (final entry in structures.entries) {
       final points = entry.value;
       final path = Path()..moveTo(points.first.dx, points.first.dy);
-      for (final p in points.skip(1)) { path.lineTo(p.dx, p.dy); }
-      canvas.drawPath(path, pen..color = accent.withValues(alpha: .23)..strokeWidth = .7);
+      for (final p in points.skip(1)) {
+        path.lineTo(p.dx, p.dy);
+      }
+      canvas.drawPath(
+        path,
+        pen
+          ..color = accent.withValues(alpha: .23)
+          ..strokeWidth = .7,
+      );
       canvas.drawPath(path.shift(const Offset(5, 5)), pen..color = line);
       canvas.drawCircle(points.last, 11, pen);
-      drawLabel(canvas, entry.key, points.last + const Offset(-50, -24), muted, size: 8);
+      drawLabel(
+        canvas,
+        entry.key,
+        points.last + const Offset(-50, -24),
+        muted,
+        size: 8,
+      );
     }
     for (final entry in moduleCenters.entries) {
       final id = entry.key, p = entry.value;
@@ -193,7 +262,9 @@ class StationPainter extends CustomPainter {
         ..close();
       final outline = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = selected == id ? 1 + .18 * math.sin(phase * math.pi * 4) : .9
+        ..strokeWidth = selected == id
+            ? 1 + .18 * math.sin(phase * math.pi * 4)
+            : .9
         ..color = color;
       canvas.drawPath(hull, Paint()..color = background);
       canvas.drawPath(
@@ -252,8 +323,19 @@ class StationPainter extends CustomPainter {
         canvas.drawCircle(
           cp,
           4,
-          Paint()..color = statusColor(cameras[i].status).withValues(alpha:
-            cameras[i].status == 'OFFLINE' ? .45 : .48 + .22 * math.pow(math.sin((phase * 6 + i * .4) * math.pi), 8).toDouble()),
+          Paint()
+            ..color = statusColor(cameras[i].status).withValues(
+              alpha: cameras[i].status == 'OFFLINE'
+                  ? .45
+                  : .48 +
+                        .22 *
+                            math
+                                .pow(
+                                  math.sin((phase * 6 + i * .4) * math.pi),
+                                  8,
+                                )
+                                .toDouble(),
+            ),
         );
         canvas.drawLine(cp, cp + const Offset(18, -14), outline..color = line);
       }
@@ -327,7 +409,8 @@ class StationPainter extends CustomPainter {
       final p = interiorPosition(n);
       final color = store.selectedId == n.id ? ink : statusColor(n.status);
       final alpha = n.type == 'SENSOR' && n.status == 'ONLINE'
-        ? .82 + .1 * math.sin((motion?.value ?? 0) * math.pi * 8) : 1.0;
+          ? .82 + .1 * math.sin((motion?.value ?? 0) * math.pi * 8)
+          : 1.0;
       canvas.drawCircle(p, 6, Paint()..color = color.withValues(alpha: alpha));
       canvas.drawLine(
         p,

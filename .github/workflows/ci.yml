@@ -123,7 +123,7 @@ jobs:
     timeout-minutes: 14
     env:
       SAM_DATABASE_URL: postgresql+psycopg://sam:ci-only-password@localhost:5432/sam
-      SAM_SIMULATION_ENABLED: 'false'
+      SAM_SIMULATION_ENABLED: 'true'
     steps:
       - uses: actions/checkout@v4
       - name: Start simulator while preparing dependencies

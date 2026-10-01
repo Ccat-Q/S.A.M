@@ -24,6 +24,10 @@ class OverviewScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final nodes = store.nodes.values.toList();
     final cameras = nodes.where((n) => n.type == 'CAMERA').toList();
+    final sensors = nodes.where((n) => n.type == 'SENSOR').toList();
+    final environment = !store.connected || sensors.isEmpty ? 'UNKNOWN'
+      : store.paused ? 'HOLD'
+      : sensors.any((n) => n.status != 'ONLINE') ? 'EXCEPTION' : 'NOMINAL';
     final faults = store.alerts.where((a) => a['state'] != 'RESOLVED').toList();
     return LayoutBuilder(
       builder: (_, box) => Stack(
@@ -108,9 +112,9 @@ class OverviewScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'ACTIVE SYSTEMS / 04',
-                  style: TextStyle(
+                Text(
+                  'ACTIVE SYSTEMS / ${nodes.where((n)=>n.type=='MODULE').length.toString().padLeft(2,'0')}',
+                  style: const TextStyle(
                     color: accent,
                     fontSize: 10,
                     letterSpacing: 1.2,
@@ -118,7 +122,7 @@ class OverviewScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  'SENSOR ARRAY    ${store.paused ? 'HOLD' : 'NOMINAL'}\nCONTROL BUS     ${store.connected ? 'READY' : 'STALE'}',
+                  'SENSOR ARRAY    $environment\nCONTROL BUS     ${store.connected ? 'READY' : 'STALE'}',
                   style: const TextStyle(
                     color: muted,
                     fontSize: 9,
@@ -157,7 +161,7 @@ class OverviewScreen extends StatelessWidget {
             child: DisplayLayer(delay: 40, child: Text('TEMP / ${store.nodes['SEN-01']?.telemetry['temperature'] ?? '--'} C',
               style: const TextStyle(fontSize: 8, color: muted)))),
           Positioned(right: 18, bottom: 203, child: Text(
-            'UPLINK / ${store.nodes['NET-01']?.status ?? 'UNKNOWN'}\nENV / ${nodes.where((n)=>n.type=='SENSOR').any((n)=>n.status!='ONLINE') ? 'EXCEPTION' : 'NOMINAL'}',
+            'UPLINK / ${store.nodes['NET-01']?.status ?? 'UNKNOWN'}\nENV / $environment',
             style: const TextStyle(fontSize: 8, color: muted, height: 2))),
         ],
       ),

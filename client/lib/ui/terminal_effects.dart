@@ -46,7 +46,10 @@ class _TerminalSurfaceState extends State<TerminalSurface>
 
   void target(Offset p, {bool transient = false}) {
     clearCursor?.cancel();
-    setState(() { cursor = p; touchedAt = transient ? DateTime.now() : null; });
+    setState(() {
+      cursor = p;
+      touchedAt = transient ? DateTime.now() : null;
+    });
     if (transient)
       clearCursor = Timer(const Duration(milliseconds: 450), () {
         if (mounted) setState(() => cursor = null);
@@ -76,8 +79,15 @@ class _TerminalSurfaceState extends State<TerminalSurface>
                       chromatic: widget.store.chromatic,
                       phase: cycle.value,
                       cursor: cursor,
-                      cursorOpacity: touchedAt == null ? 1 :
-                        (1 - DateTime.now().difference(touchedAt!).inMilliseconds / 450).clamp(0.0,1.0).toDouble(),
+                      cursorOpacity: touchedAt == null
+                          ? 1
+                          : (1 -
+                                    DateTime.now()
+                                            .difference(touchedAt!)
+                                            .inMilliseconds /
+                                        450)
+                                .clamp(0.0, 1.0)
+                                .toDouble(),
                     ),
                   ),
                 ),
@@ -187,13 +197,17 @@ class DisplayLayer extends StatelessWidget {
   const DisplayLayer({super.key, required this.child, this.delay = 0});
   @override
   Widget build(BuildContext context) => TweenAnimationBuilder<double>(
-    tween: Tween(begin: MediaQuery.disableAnimationsOf(context) ? 1.0 : 0.0, end: 1.0),
+    tween: Tween(
+      begin: MediaQuery.disableAnimationsOf(context) ? 1.0 : 0.0,
+      end: 1.0,
+    ),
     duration: const Duration(milliseconds: 380),
     builder: (_, progress, child) {
       final start = delay / 380;
       final reveal = ((progress - start) / (1 - start)).clamp(0.0, 1.0);
       return ClipRect(clipper: _DisplayClip(reveal), child: child);
-    }, child: child,
+    },
+    child: child,
   );
 }
 
