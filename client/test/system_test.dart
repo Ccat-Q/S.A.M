@@ -348,6 +348,7 @@ void main() {
     store.connected = true;
     await tester.pumpWidget(MaterialApp(theme: samTheme(), home: SystemShell(store: store)));
     await tester.tap(find.byKey(const Key('tab-3')));
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('NO ACTIVE EXCEPTIONS'), findsOneWidget);
     await tester.tap(find.byKey(const Key('soft-HISTORY')));
@@ -386,10 +387,11 @@ void main() {
           {'node_id': 'DEV-01', 'x': .3, 'y': .3, 'width': .2, 'height': .2},
         ],
       };
+      final scanPaths = <String>[];
       final api = SamApi(
         'https://example.com',
         client: MockClient((request) async {
-          expect(request.url.path, '/api/nodes/DEV-01/scan');
+          scanPaths.add(request.url.path);
           return http.Response(
             jsonEncode({'node': device, 'scan_id': 'receipt'}),
             200,
@@ -431,6 +433,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 100));
       }
       expect(store.stage, 'IDENTIFIED', reason: SystemMessages.shared.message);
+      expect(scanPaths, ['/api/nodes/DEV-01/scan']);
       expect(find.textContaining('CLASS POWER'), findsOneWidget);
       expect(store.linked, isFalse);
       expect(terminals, 0);
