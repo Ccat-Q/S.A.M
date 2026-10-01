@@ -12,6 +12,7 @@ import 'package:sam_client/ui/system_shell.dart';
 import 'package:sam_client/ui/camera_screen.dart';
 import 'package:sam_client/ui/terminal_actions.dart';
 import 'package:sam_client/ui/alert_screen.dart';
+import 'package:sam_client/ui/instruments.dart';
 
 Map<String, dynamic> fixture() => {
   'nodes': [
